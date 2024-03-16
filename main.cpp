@@ -54,12 +54,13 @@ struct Boat
 struct Item
 {
     // 物品位置，价值和剩余帧数
-    int x, y, val, surplus_time;
+    int x, y, val, appear_frame;
     Item(){}
-    Item(int x, int y, int val) {
+    Item(int x, int y, int val, int appear_frame) {
         this -> x = x;
         this -> y = y;
         this -> val = val;
+        this -> appear_frame = appear_frame;
     }
     // 重载运算符，从大到小排序
     bool operator < (const Item &a) const {
@@ -86,8 +87,9 @@ void Init()
     printf("OK\n");
     fflush(stdout);
 }
-// 物品优先队列，价值越大越靠前
-priority_queue<Item> items;
+
+deque<Item> items;
+multiset<Item> items_set;
 
 int Input()
 {
@@ -101,9 +103,15 @@ int Input()
         // 新增物品的位置和价值
         int x, y, val;
         scanf("%d%d%d", &x, &y, &val);
-        items.push(Item(x, y, val));
+        Item item = Item(x, y, val, id);
+        items.push_back(item);
+        items_set.insert(item);
     }
 
+    while(!items.empty() && items.front().appear_frame <= id - 1000) {
+        items_set.erase(items_set.find(items.front()));
+        items.pop_front();
+    }
     for(int i = 0; i < robot_num; i ++)
     {
         int sts;
