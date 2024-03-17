@@ -10,11 +10,14 @@ const int boat_num = 5;
 const int N = 210;
 // 金钱，船只容量，当前帧数
 int money, boat_capacity, id;
+const int dxs[] = {0, 0, -1, 1};
+const int dys[] = {1, -1, 0, 0};
 // 地图
 char ch[N][N];
 int gds[N][N];
 // 十个机器人的路径
 list<int> paths[10];
+list<pair<int, int>> paths_road[10];
 // 当前路径的迭代器
 list<int>::iterator current_index[10];
 
@@ -160,7 +163,6 @@ int Heuristic(int x, int y, int xx, int yy)
     return abs(x - xx) + abs(y - yy);
 }
 
-
 // A*搜索算法
 bool AStarSearch(Item target, int robot_index) {
     priority_queue<Node> open_list;
@@ -184,8 +186,10 @@ bool AStarSearch(Item target, int robot_index) {
         if (current.x == target.x && current.y == target.y) {
             // 保存路径
             for (Node p = current; p.x != -1 && p.y != -1; p = parents[p.x][p.y]) {
+                paths_road[robot_index].push_front({p.x, p.y});
                 paths[robot_index].push_front(directions[p.x][p.y]);
             }
+            // 路径长度为n的话，操作就是n-1次
             paths[robot_index].pop_front();
             return true;
         }
@@ -196,8 +200,6 @@ bool AStarSearch(Item target, int robot_index) {
         closed_list[current.x][current.y] = true;
 
         // 检查周围的节点
-        int dxs[] = {0, 0, -1, 1};
-        int dys[] = {1, -1, 0, 0};
         for (int i = 0; i < 4; i++) {
             int nx = current.x + dxs[i];
             int ny = current.y + dys[i];
@@ -219,24 +221,63 @@ int main()
     for(int zhen = 1; zhen <= 15000; zhen ++)
     {
         int id = Input();
-        for(int i = 0; i < robot_num; i ++) {
-            if(robot[i].goods == 0 && paths[i].empty() && !items_set.empty()){
-                for(auto it = items_set.begin(); it != items_set.end(); it++) {
-                    if(AStarSearch(*it, i)) {
-                        items_set.erase(it);
-                        current_index[i] = paths[i].begin();
-                        break;
+
+        // 机器人部分
+        for(int bot_num = 0; bot_num < robot_num; bot_num++){
+            // 机器人包括五个状态
+            // 0:寻找去货物的最短路 1:运输途中 2: 到达货物点 3: 寻找到泊位的最短路 4: 到达泊位
+            switch (robot[bot_num].zt)
+            {
+            case 0:{
+                // 遍历所有货物
+                int count = 0;
+                for(auto it = items_set.begin(); it != items_set.end(); it ++) {
+                    if(count > 5) break;
+                    if(robot[bot_num].goods == 0) {
+                        if(AStarSearch(*it, bot_num)) {
+                            // 将路径和移动写入f1
+                            for(auto it = paths_road[bot_num].begin(); it != paths_road[bot_num].end(); it ++) {
+                                f1 << "move " << bot_num << " " << it -> first << " " << it -> second << endl;
+                            }
+                            f1 << "\n";
+                            robot[bot_num].zt = 1;
+                            current_index[bot_num] = paths[bot_num].begin();
+                            items_set.erase(it);
+                            break;
+                        }
                     }
+                    count ++;
+                }
+                // 没有找到最短路，跳过此机器人
+                // 如果不为0，说明找到了最短路，可以走一步
+                if(robot[bot_num].zt == 0) {
+                    break;
                 }
             }
-        }
-        // 输出路径
-        for(int i = 0; i < robot_num; i ++) {
-            if(!paths[i].empty() and current_index[i] != paths[i].end()) {
-                printf("move %d %d\n", i, *current_index[i]);
-                current_index[i]++;
+            case 1:{
+                int direction = *current_index[bot_num];
+                printf("move %d %d\n", bot_num, direction);
+                current_index[bot_num] ++;
+                if(current_index[bot_num] == paths[bot_num].end()) {
+                    robot[bot_num].zt = 2;
+                }
             }
+            case 2:{
+
+            }
+            case 3:{
+
+            }
+            case 4:{
+
+            }
+            default:
+                break;
+            }
+            
         }
+
+        
         puts("OK");
         fflush(stdout);
     }
