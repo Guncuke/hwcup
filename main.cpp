@@ -88,7 +88,7 @@ void Init()
     fflush(stdout);
 }
 
-deque<Item> items;
+deque<Item> items_exist;
 multiset<Item> items_set;
 
 int Input()
@@ -104,13 +104,13 @@ int Input()
         int x, y, val;
         scanf("%d%d%d", &x, &y, &val);
         Item item = Item(x, y, val, id);
-        items.push_back(item);
+        items_exist.push_back(item);
         items_set.insert(item);
     }
 
-    while(!items.empty() && items.front().appear_frame <= id - 1000) {
-        items_set.erase(items_set.find(items.front()));
-        items.pop_front();
+    while(!items_exist.empty() && items_exist.front().appear_frame <= id - 1000) {
+        items_set.erase(items_set.find(items_exist.front()));
+        items_exist.pop_front();
     }
     for(int i = 0; i < robot_num; i ++)
     {
@@ -123,7 +123,6 @@ int Input()
         scanf("%d%d\n", &boat[i].status, &boat[i].pos);
     char okk[100];
     scanf("%s", okk);
-    puts("OK");
     return id;
 }
 
@@ -152,8 +151,13 @@ void AStarSearch(Item target, int robot_index) {
     bool closed_list[n][n] = {false};
     // 用来获得路径
     Node parents[n][n];
+    for(int i = 0; i < n; i++) 
+	{
+		for(int j = 0; j < n; j++) {
+			parents[i][j] = {-1, -1};
+		}
+	}
     int directions[n][n];
-
     int start_x = robot[robot_index].x, start_y = robot[robot_index].y;
     open_list.push({start_x, start_y, 0, Heuristic(start_x, start_y, target.x, target.y), {-1, -1}});
 
@@ -166,6 +170,7 @@ void AStarSearch(Item target, int robot_index) {
             for (Node p = current; p.x != -1 && p.y != -1; p = parents[p.x][p.y]) {
                 paths[robot_index].push_front(directions[p.x][p.y]);
             }
+            paths[robot_index].pop_front();
             return;
         }
 
@@ -181,9 +186,9 @@ void AStarSearch(Item target, int robot_index) {
             int nx = current.x + dxs[i];
             int ny = current.y + dys[i];
             if (nx >= 0 && nx < 200 && ny >= 0 && ny < 200 && !closed_list[nx][ny] && ch[nx][ny] == '.') {
-                open_list.push({nx, ny, current.g + 1, Heuristic(nx, ny, target.x, target.y), {current.x, current.y}});
                 parents[nx][ny] = current;
                 directions[nx][ny] = i;
+                open_list.push({nx, ny, current.g + 1, Heuristic(nx, ny, target.x, target.y), {current.x, current.y}});
             }
         }
     }
@@ -192,21 +197,20 @@ void AStarSearch(Item target, int robot_index) {
 int main()
 {
     Init();
-    for (int i = 0; i < 10; ++i) 
-    {
-        current[i] = paths[i].begin();
-    }
     for(int zhen = 1; zhen <= 15000; zhen ++)
     {
         int id = Input();
         if(zhen == 1) {
-            AStarSearch(items.top(), 0);
+            for(auto &item: items_set) {
+                AStarSearch(item, 0);
+                if(!paths[0].empty()) {
+                    current[0] = paths[0].begin()++;
+                    break;
+                }
+            }
         }
-        // if(robot[0].goods == 0 && !items.empty() && paths[0].empty()) {
-        //     AStarSearch(items.top(), 0);
-        // }
         if(!paths[0].empty() and current[0] != paths[0].end()) {
-            printf("move %d %d", 0, *current[0]);
+            printf("move %d %d\n", 0, *current[0]);
             current[0]++;
         }
         puts("OK");
