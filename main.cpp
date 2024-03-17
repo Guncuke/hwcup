@@ -1,11 +1,22 @@
 #include <bits/stdc++.h>
+#include<fstream>
 using namespace std;
+fstream f1;
 
 const int n = 200;
 const int robot_num = 10;
 const int berth_num = 10;
 const int boat_num = 5;
 const int N = 210;
+// 金钱，船只容量，当前帧数
+int money, boat_capacity, id;
+// 地图
+char ch[N][N];
+int gds[N][N];
+// 十个机器人的路径
+list<int> paths[10];
+// 当前路径的迭代器
+list<int>::iterator current_index[10];
 
 struct Robot
 {
@@ -68,18 +79,22 @@ struct Item
     }
 };
 
-int money, boat_capacity, id;
-char ch[N][N];
-int gds[N][N];
+deque<Item> items_exist;
+multiset<Item> items_set;
+
 void Init()
 {
     for(int i = 1; i <= n; i ++)
-        scanf("%s", ch[i]);
+        scanf("%s", ch[i]+1);
+    
+    // 读入泊位信息
     for(int i = 0; i < berth_num; i ++)
     {
         int id;
         scanf("%d", &id);
         scanf("%d%d%d%d", &berth[id].x, &berth[id].y, &berth[id].transport_time, &berth[id].loading_speed);
+        berth[id].x ++;
+        berth[id].y ++;
     }
     scanf("%d", &boat_capacity);
     char okk[100];
@@ -88,38 +103,40 @@ void Init()
     fflush(stdout);
 }
 
-deque<Item> items_exist;
-multiset<Item> items_set;
 
 int Input()
 {
     // 当前帧和金钱
     scanf("%d%d", &id, &money);
     int num;
-    // 场上新增货物数量
+    // 读入新增物品信息
     scanf("%d", &num);
     for(int i = 1; i <= num; i ++)
     {
         // 新增物品的位置和价值
         int x, y, val;
         scanf("%d%d%d", &x, &y, &val);
-        Item item = Item(x, y, val, id);
+        Item item = Item(x+1, y+1, val, id);
         items_exist.push_back(item);
         items_set.insert(item);
     }
-
     while(!items_exist.empty() && items_exist.front().appear_frame <= id - 1000) {
         items_set.erase(items_set.find(items_exist.front()));
         items_exist.pop_front();
     }
+
+    // 读入机器人信息
     for(int i = 0; i < robot_num; i ++)
     {
         int sts;
         // 是否携带货物，坐标，状态
         scanf("%d%d%d%d", &robot[i].goods, &robot[i].x, &robot[i].y, &sts);
+        robot[i].x ++;
+        robot[i].y ++;
     }
+
+    // 读入船只信息
     for(int i = 0; i < boat_num; i ++)
-        // 船的状态和目标泊位
         scanf("%d%d\n", &boat[i].status, &boat[i].pos);
     char okk[100];
     scanf("%s", okk);
@@ -142,22 +159,20 @@ int Heuristic(int x, int y, int xx, int yy)
     return abs(x - xx) + abs(y - yy);
 }
 
-// 十个机器人的路径
-list<int> paths[10];
-list<int>::iterator current[10];
+
 // A*搜索算法
-void AStarSearch(Item target, int robot_index) {
+bool AStarSearch(Item target, int robot_index) {
     priority_queue<Node> open_list;
-    bool closed_list[n][n] = {false};
+    bool closed_list[N][N] = {false};
     // 用来获得路径
-    Node parents[n][n];
-    for(int i = 0; i < n; i++) 
+    Node parents[N][N];
+    for(int i = 1; i <= n; i++) 
 	{
-		for(int j = 0; j < n; j++) {
+		for(int j = 1; j <= n; j++) {
 			parents[i][j] = {-1, -1};
 		}
 	}
-    int directions[n][n];
+    int directions[N][N];
     int start_x = robot[robot_index].x, start_y = robot[robot_index].y;
     open_list.push({start_x, start_y, 0, Heuristic(start_x, start_y, target.x, target.y), {-1, -1}});
 
@@ -171,7 +186,7 @@ void AStarSearch(Item target, int robot_index) {
                 paths[robot_index].push_front(directions[p.x][p.y]);
             }
             paths[robot_index].pop_front();
-            return;
+            return true;
         }
 
         if (closed_list[current.x][current.y]) {
@@ -185,37 +200,51 @@ void AStarSearch(Item target, int robot_index) {
         for (int i = 0; i < 4; i++) {
             int nx = current.x + dxs[i];
             int ny = current.y + dys[i];
-            if (nx >= 0 && nx < 200 && ny >= 0 && ny < 200 && !closed_list[nx][ny] && ch[nx][ny] == '.') {
+            if (nx >= 1 && nx < 201 && ny >= 1 && ny < 201 && !closed_list[nx][ny] && ch[nx][ny] == '.') {
                 parents[nx][ny] = current;
                 directions[nx][ny] = i;
                 open_list.push({nx, ny, current.g + 1, Heuristic(nx, ny, target.x, target.y), {current.x, current.y}});
             }
         }
     }
+    return false;
 }
 
 int main()
-{
+{   
+    f1.open("data.txt",ios::out);
     Init();
+    int index = 0;
     for(int zhen = 1; zhen <= 15000; zhen ++)
     {
         int id = Input();
-        if(zhen == 1) {
-            for(auto &item: items_set) {
-                AStarSearch(item, 0);
-                if(!paths[0].empty()) {
-                    current[0] = paths[0].begin()++;
-                    break;
+        // 每一帧计算一个机器人的路径
+        int solved = 0;
+        for(int i = 0; i < robot_num; i ++) {
+            if(i==4) continue;
+            if(solved==1) break;
+            if(robot[i].goods == 0 && paths[i].empty() && !items_set.empty()){
+                for(auto it = items_set.begin(); it != items_set.end(); it++) {
+                    if(AStarSearch(*it, i)) {
+                        items_set.erase(it);
+                        current_index[i] = paths[i].begin();
+                        solved++;
+                        robot[i].goods = 1;
+                        break;
+                    }
                 }
             }
         }
-        if(!paths[0].empty() and current[0] != paths[0].end()) {
-            printf("move %d %d\n", 0, *current[0]);
-            current[0]++;
+        // 输出路径
+        for(int i = 0; i < robot_num; i ++) {
+            if(!paths[i].empty() and current_index[i] != paths[i].end()) {
+                printf("move %d %d\n", i, *current_index[i]);
+                current_index[i]++;
+            }
         }
         puts("OK");
         fflush(stdout);
     }
-
+    f1.close();
     return 0;
 }
