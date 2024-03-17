@@ -218,18 +218,12 @@ int main()
     for(int zhen = 1; zhen <= 15000; zhen ++)
     {
         int id = Input();
-        // 每一帧计算一个机器人的路径
-        int solved = 0;
         for(int i = 0; i < robot_num; i ++) {
-            if(i==4) continue;
-            if(solved==1) break;
             if(robot[i].goods == 0 && paths[i].empty() && !items_set.empty()){
                 for(auto it = items_set.begin(); it != items_set.end(); it++) {
                     if(AStarSearch(*it, i)) {
                         items_set.erase(it);
                         current_index[i] = paths[i].begin();
-                        solved++;
-                        robot[i].goods = 1;
                         break;
                     }
                 }
