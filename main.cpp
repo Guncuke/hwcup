@@ -23,6 +23,7 @@ struct Robot
     int x, y, goods;
     int status;
     int mbx, mby;
+    int zt;
     Robot() {}
     Robot(int startX, int startY) {
         x = startX;
