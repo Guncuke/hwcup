@@ -49,7 +49,7 @@ struct Berth
     int transport_time;
     // 泊位装载速度
     int loading_speed;
-    // 泊位物品个数
+    // 泊位物品
     int items_num=0;
     Berth(){}
     Berth(int x, int y, int transport_time, int loading_speed) {
@@ -66,7 +66,7 @@ struct Boat
     // status: 0: 运输中 1: 装货或运输完成 2:泊位外等待
     // pos: 目标泊位
     // arrive_time: 到达时间
-    int num, pos, status, arrive_time;
+    int num=0, pos, status, arrive_time;
     Boat(){}
     Boat(int num, int pos, int status) {
         this -> num = num;
@@ -314,7 +314,7 @@ int main()
                 // TODO: 估算物品距离和价值，综合排序（优先队列）
                 // 距离不是机器人到物品的距离，是物品到泊位的min距离
                 for(auto it = items_set.begin(); it != items_set.end(); it ++) {
-                    if(count > 2) break;
+                    if(count > 5) break;
                     if(AStarSearchItem(*it, bot)) {
                         bot.zt = 1;
                         items_set.erase(it);
@@ -389,9 +389,9 @@ int main()
                 // TODO: 估算泊位距离和价值，综合排序（优先队列）
                 for(int i = 0; i < berth_num; i ++){
                     if(count > 5) break;
-                    if(AStarSearchBerth(berth[bot_num%2], bot)) {
+                    if(AStarSearchBerth(berth[bot_num/2], bot)) {
                         bot.zt = 4;
-                        bot.target_berth = bot_num%2;
+                        bot.target_berth = bot_num/2;
                         break;
                     }
                     count ++;
@@ -471,15 +471,29 @@ int main()
         {   
             // 如果在虚拟点，出发
             if(boat[i].status == 1 && boat[i].pos== -1) {
-                printf("ship %d %d\n", i, i*2);
+                boat[i].num = 0;
+                printf("ship %d %d\n", i, i);
             }
             // 到达泊位
             else if(boat[i].status == 1 && boat[i].pos != -1) {
-                if(berth[boat[i].pos].items_num > 0) {
-                    berth[boat[i].pos].items_num -= berth[boat[i].pos].loading_speed;
+                // 目标泊位
+                int target_berth = boat[i].pos;
+                // 泊位没有货物，此帧等待
+                if(berth[target_berth].items_num == 0){
+                    break;
                 }
+                // 有货物，装载
                 else{
-                    printf("go %d\n", i);
+                    // 泊位可以给那么多
+                    int upload_num = min(berth[target_berth].loading_speed, berth[target_berth].items_num);
+                    // 船上还能装多少
+                    upload_num = min(upload_num, boat_capacity - boat[i].num);
+                    boat[i].num += upload_num;
+                    berth[target_berth].items_num -= upload_num;
+                    // 没货了就走
+                    if(berth[target_berth].items_num == 0) {
+                        printf("go %d\n", i);
+                    }
                 }
             }
         }
