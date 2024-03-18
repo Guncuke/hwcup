@@ -8,12 +8,13 @@ const int robot_num = 10;
 const int berth_num = 10;
 const int boat_num = 5;
 const int N = 210;
-// 金钱，船只容量，当前帧数
-int money, boat_capacity, id;
 const int dxs[] = {0, 0, -1, 1};
 const int dys[] = {1, -1, 0, 0};
+// 金钱，船只容量，当前帧数
+int money, boat_capacity, id;
 // 地图
 char ch[N][N];
+// 物品位置
 int gds[N][N];
 
 struct Robot
