@@ -22,7 +22,8 @@ struct Robot
     int x, y, goods;
     int status;
     int mbx, mby;
-    int zt;
+    int zt=0;
+    int target_berth;
     // 当前机器人的路径和当前位置
     list<pair<int, int>> path;
     list<pair<int, int>>::iterator current_index;
@@ -48,6 +49,8 @@ struct Berth
     int transport_time;
     // 泊位装载速度
     int loading_speed;
+    // 泊位物品个数
+    int items_num=0;
     Berth(){}
     Berth(int x, int y, int transport_time, int loading_speed) {
         this -> x = x;
@@ -62,7 +65,8 @@ struct Boat
     // num: 当前装载量
     // status: 0: 运输中 1: 装货或运输完成 2:泊位外等待
     // pos: 目标泊位
-    int num, pos, status;
+    // arrive_time: 到达时间
+    int num, pos, status, arrive_time;
     Boat(){}
     Boat(int num, int pos, int status) {
         this -> num = num;
@@ -303,7 +307,7 @@ int main()
             // 所有机器人的初始状态，没有物品，寻路去找物品
             case 0:{
                 f1 << bot_num << ' ' << 0 << endl;
-                if(astar_time > 1) break;
+                if(astar_time > 3) break;
                 astar_time ++;
                 int count = 0;
                 bot.clearPath();
@@ -378,15 +382,16 @@ int main()
             // 寻找泊位，能进入状态3，就是已经有物品了
             case 3:{
                 f1 << bot_num << ' ' << 3 << endl;
-                if(astar_time > 1) break;
+                if(astar_time > 3) break;
                 astar_time ++;
                 int count = 0;
                 bot.clearPath();
                 // TODO: 估算泊位距离和价值，综合排序（优先队列）
                 for(int i = 0; i < berth_num; i ++){
                     if(count > 5) break;
-                    if(AStarSearchBerth(berth[bot_num], bot)) {
+                    if(AStarSearchBerth(berth[bot_num%2], bot)) {
                         bot.zt = 4;
+                        bot.target_berth = bot_num%2;
                         break;
                     }
                     count ++;
@@ -414,6 +419,7 @@ int main()
                     // 可以进行小判断，如果已经机器人已经放下，就进入状态0，没拾取重新拾取，提前一帧
                     if(bot.goods == 0) {
                         bot.zt = 0;
+                        berth[bot.target_berth].items_num++;
                     }
                     else{
                         printf("pull %d\n", bot_num);
@@ -432,9 +438,10 @@ int main()
             }
             case 5:{
                 f1 << bot_num << ' ' << 5 << endl;
-                // 被提前放下
+                // 被放下
                 if(bot.goods == 0) {
                     bot.zt = 0;
+                    berth[bot.target_berth].items_num++;
                 }
                 else{
                     printf("pull %d\n", bot_num);
@@ -458,6 +465,23 @@ int main()
                 break;
             }
             
+        }
+
+        for(int i = 0; i < boat_num; i ++)
+        {   
+            // 如果在虚拟点，出发
+            if(boat[i].status == 1 && boat[i].pos== -1) {
+                printf("ship %d %d\n", i, i*2);
+            }
+            // 到达泊位
+            else if(boat[i].status == 1 && boat[i].pos != -1) {
+                if(berth[boat[i].pos].items_num > 0) {
+                    berth[boat[i].pos].items_num -= berth[boat[i].pos].loading_speed;
+                }
+                else{
+                    printf("go %d\n", i);
+                }
+            }
         }
         puts("OK");
         fflush(stdout);
