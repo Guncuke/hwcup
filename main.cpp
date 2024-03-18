@@ -15,10 +15,6 @@ const int dys[] = {1, -1, 0, 0};
 // 地图
 char ch[N][N];
 int gds[N][N];
-// 十个机器人的路径
-list<pair<int, int>> paths[10];
-// 当前路径的迭代器
-list<pair<int, int>>::iterator current_index[10];
 
 struct Robot
 {
@@ -26,10 +22,19 @@ struct Robot
     int status;
     int mbx, mby;
     int zt;
+    // 当前机器人的路径和当前位置
+    list<pair<int, int>> path;
+    list<pair<int, int>>::iterator current_index;
+    list<pair<int, int>>::iterator next_index;
     Robot() {}
     Robot(int startX, int startY) {
         x = startX;
         y = startY;
+    }
+    void clearPath(){
+        path.clear();
+        current_index = path.end();
+        next_index = path.end();
     }
 }robot[robot_num + 10];
 
@@ -125,9 +130,9 @@ int Input()
         items_set.insert(item);
     }
     while(!items_exist.empty() && items_exist.front().appear_frame <= id - 1000) {
-        Item item_del = items_exist.front();
-        items_set.erase(items_set.find(item_del));
-        gds[item_del.x][item_del.y] = 0;
+        f1 << "erase" << items_exist.front().appear_frame << endl;
+        items_set.erase(items_exist.front());
+        gds[items_exist.front().x][items_exist.front().y] = 0;
         items_exist.pop_front();
     }
 
@@ -136,7 +141,7 @@ int Input()
     {
         int sts;
         // 是否携带货物，坐标，状态
-        scanf("%d%d%d%d", &robot[i].goods, &robot[i].x, &robot[i].y, &sts);
+        scanf("%d%d%d%d", &robot[i].goods, &robot[i].x, &robot[i].y, &robot[i].status);
         robot[i].x ++;
         robot[i].y ++;
     }
@@ -160,19 +165,19 @@ struct Node {
     }
 };
 // 计算启发式距离
-int Heuristic(int x, int y, int xx, int yy)
+int HeuristicItem(int x, int y, int xx, int yy)
 {
     return abs(x - xx) + abs(y - yy);
 }
 
-// A*搜索算法
-bool AStarSearch(Item target, int robot_index) {
+// A*寻找物品
+bool AStarSearchItem(Item target, Robot& bot) {
     priority_queue<Node> open_list;
     bool closed_list[N][N] = {false};
     // 用来获得路径
     Node parents[N][N];
-    int start_x = robot[robot_index].x, start_y = robot[robot_index].y;
-    open_list.push({start_x, start_y, 0, Heuristic(start_x, start_y, target.x, target.y), {-1, -1}});
+    int start_x = bot.x, start_y = bot.y;
+    open_list.push({start_x, start_y, 0, HeuristicItem(start_x, start_y, target.x, target.y), {-1, -1}});
 
     while (!open_list.empty()) {
         Node current = open_list.top();
@@ -181,9 +186,11 @@ bool AStarSearch(Item target, int robot_index) {
         if (current.x == target.x && current.y == target.y) {
             // 保存路径
             for (Node p = current; p.x != start_x || p.y != start_y; p = parents[p.x][p.y]) {
-                paths[robot_index].push_front({p.x, p.y});
+                bot.path.push_front({p.x, p.y});
             }
-            paths[robot_index].push_front({start_x, start_y});
+            bot.path.push_front({start_x, start_y});
+            bot.current_index = bot.path.begin();
+            bot.next_index = bot.path.begin();
             return true;
         }
 
@@ -198,14 +205,62 @@ bool AStarSearch(Item target, int robot_index) {
             int ny = current.y + dys[i];
             if (nx >= 1 && nx < 201 && ny >= 1 && ny < 201 && !closed_list[nx][ny] && ch[nx][ny] != '*' && ch[nx][ny] != '#') {
                 parents[nx][ny] = current;
-                open_list.push({nx, ny, current.g + 1, Heuristic(nx, ny, target.x, target.y), {current.x, current.y}});
+                open_list.push({nx, ny, current.g + 1, HeuristicItem(nx, ny, target.x, target.y), {current.x, current.y}});
             }
         }
     }
     return false;
 }
 
-int get_direction(pair<int, int> a, pair<int, int> b) {
+int HeuristicBerth(int x, int y, int xx, int yy) {
+    int center_x = yy + 2;
+    int center_y = xx + 2;
+    return abs(x - center_x) + abs(y - center_y);
+}
+
+// A*寻找泊位
+bool AStarSearchBerth(Berth& target, Robot& bot) {
+    priority_queue<Node> open_list;
+    bool closed_list[N][N] = {false};
+    // 用来获得路径
+    Node parents[N][N];
+    int start_x = bot.x, start_y = bot.y;
+    open_list.push({start_x, start_y, 0, HeuristicBerth(start_x, start_y, target.x, target.y), {-1, -1}});
+
+    while (!open_list.empty()) {
+        Node current = open_list.top();
+        open_list.pop();
+
+        if (current.x >= target.x && current.x < target.x + 4 && current.y >= target.y && current.y < target.y + 4) {
+            // 保存路径
+            for (Node p = current; p.x != start_x || p.y != start_y; p = parents[p.x][p.y]) {
+                bot.path.push_front({p.x, p.y});
+            }
+            bot.path.push_front({start_x, start_y});
+            bot.current_index = bot.path.begin();
+            bot.next_index = bot.path.begin();
+            return true;
+        }
+
+        if (closed_list[current.x][current.y]) {
+            continue;  // 已经检查过这个节点
+        }
+        closed_list[current.x][current.y] = true;
+
+        // 检查周围的节点
+        for (int i = 0; i < 4; i++) {
+            int nx = current.x + dxs[i];
+            int ny = current.y + dys[i];
+            if (nx >= 1 && nx < 201 && ny >= 1 && ny < 201 && !closed_list[nx][ny] && ch[nx][ny] != '*' && ch[nx][ny] != '#') {
+                parents[nx][ny] = current;
+                open_list.push({nx, ny, current.g + 1, HeuristicBerth(nx, ny, target.x, target.y), {current.x, current.y}});
+            }
+        }
+    }
+    return false;
+}
+
+int GetDirection(pair<int, int> a, pair<int, int> b) {
     // a:当前坐标 b:下一时刻
     if(a.first == b.first) {
         if(a.second < b.second) {
@@ -230,97 +285,179 @@ int main()
     for(int zhen = 1; zhen <= 15000; zhen ++)
     {
         int id = Input();
+        f1 << "id: " << id << endl;
         // 机器人部分
         // 因为时间限制，每一轮能A*的机器人数量需要限制
         int astar_time = 0;
         for(int bot_num = 0; bot_num < robot_num; bot_num++){
-            // 机器人包括五个状态
-            // 0:寻找去货物的最短路 1:运输途中 2: 到达货物点 3: 寻找到泊位的最短路 4: 到达泊位
-            switch (robot[bot_num].zt)
+            Robot& bot = robot[bot_num];
+            // 防止意外，不知道什么时候机器人进入恢复状态
+            if(bot.status==0){
+                bot.zt=6;
+            }
+            // 机器人包括6个状态
+            // 0:寻找去货物的最短路 1:运输途中 2: 到达货物点 3: 寻找到泊位的最短路 4：去往泊位 5: 到达泊位 6：恢复状态
+            switch (bot.zt)
             {
             // 所有机器人的初始状态，没有物品，寻路去找物品
             case 0:{
+                f1 << bot_num << ' ' << 0 << endl;
                 if(astar_time > 1) break;
                 astar_time ++;
-                // 遍历所有货物
                 int count = 0;
+                bot.clearPath();
+                // TODO: 估算物品距离和价值，综合排序（优先队列）
+                // 距离不是机器人到物品的距离，是物品到泊位的min距离
                 for(auto it = items_set.begin(); it != items_set.end(); it ++) {
-                    if(count > 5) break;
-                    if(robot[bot_num].goods == 0) {
-                        if(AStarSearch(*it, bot_num)) {
-                            // 如果寻到路径，这里不break switch，在当前帧进入状态1
-                            robot[bot_num].zt = 1;
-                            current_index[bot_num] = paths[bot_num].begin();
-                            items_set.erase(it);
-                            break;
-                        }
+                    if(count > 2) break;
+                    if(AStarSearchItem(*it, bot)) {
+                        bot.zt = 1;
+                        items_set.erase(it);
+                        break;
                     }
                     count ++;
                 }
                 // 没有找到最短路，跳过此机器人
-                // 如果不为0，说明找到了最短路，可以走一步
-                if(robot[bot_num].zt == 0) {
+                if(bot.zt == 0) {
                     break;
                 }
+                // 正常找到路径，此帧可以继续走一步，不break
             }
+            // 去物品点状态
             case 1:{
-                // 出现了丢帧
-                if(robot[bot_num].x != current_index[bot_num] -> first && robot[bot_num].y != current_index[bot_num] -> second) {
+                f1 << bot_num << ' '<< 1 << endl;
+                // 出现了与预测不符的情况，重新寻路
+                if(bot.x != bot.next_index -> first && bot.y != bot.next_index -> second) {
                     f1 << "re find!" << endl;
-                    paths[bot_num].clear();
-                    current_index[bot_num] = paths[bot_num].begin();
-                    robot[bot_num].zt = 0;
+                    bot.zt = 0;
                     break;
+                }
+                else{
+                    bot.current_index = bot.next_index;
                 }
                 // 系统确认到达目的地
-                if(robot[bot_num].x == paths[bot_num].back().first && robot[bot_num].y == paths[bot_num].back().second){
-                    // TODO:可以进行小判断，如果已经机器人已经拾取，就进入状态3，没拾取重新拾取，提前一帧
-                    robot[bot_num].zt = 2;
+                if(bot.x == bot.path.back().first && bot.y == bot.path.back().second){
+                    // 可以进行小判断，如果已经机器人已经拾取，就进入状态3，没拾取重新拾取，提前一帧
+                    if(bot.goods == 1) {
+                        bot.zt = 3;
+                    }
+                    else{
+                        printf("get %d\n", bot_num);
+                        bot.zt = 2;
+                    }
                     break;
                 }
-                current_index[bot_num] ++;
-                int direction = get_direction({robot[bot_num].x, robot[bot_num].y}, *current_index[bot_num]);
-                f1 << "move " << bot_num << " " << direction << endl;
+                bot.next_index = next(bot.current_index);
+                int direction = GetDirection(*bot.current_index, *bot.next_index);
                 printf("move %d %d\n", bot_num, direction);
                 // 提前拾取
-                if(current_index[bot_num] == paths[bot_num].end()) {
+                if(bot.next_index == bot.path.end()) {
                     printf("get %d\n", bot_num);
                 }
                 break;
-
             }
             // 能进入状态2，就是已经站在物品点了
             case 2:{
+                f1 << bot_num << ' ' << 2 << endl;
                 // 被提前拾取
-                if(robot[bot_num].goods == 1) {
-                    robot[bot_num].zt = 3;
+                if(bot.goods == 1) {
+                    bot.zt = 3;
                 }
                 else{
-                    if(gds[robot[bot_num].x][robot[bot_num].y] != 0) {
+                    if(gds[bot.x][bot.y] != 0) {
                         printf("get %d\n", bot_num);
                     }
                     // 物品消失，重新寻路
                     else{
-                        robot[bot_num].zt = 0;
+                        bot.zt = 0;
                     }
                 }
                 break;
             }
-            // 去泊位，能进入状态3，就是已经有物品了
+            // 寻找泊位，能进入状态3，就是已经有物品了
             case 3:{
-                
+                f1 << bot_num << ' ' << 3 << endl;
+                if(astar_time > 1) break;
+                astar_time ++;
+                int count = 0;
+                bot.clearPath();
+                // TODO: 估算泊位距离和价值，综合排序（优先队列）
+                for(int i = 0; i < berth_num; i ++){
+                    if(count > 5) break;
+                    if(AStarSearchBerth(berth[bot_num], bot)) {
+                        bot.zt = 4;
+                        break;
+                    }
+                    count ++;
+                }
+                // 没有找到最短路，跳过此机器人
+                if(bot.zt == 3) {
+                    break;
+                }
+                // 寻到路径直接进入状态4
             }
-            // 进入状态4，说明已经到达泊位
+            // 去泊位状态
             case 4:{
-
+                f1 << bot_num << ' ' << 4 << endl;
+                // 出现了与预测不符的情况，重新寻路
+                if(bot.x != bot.next_index -> first && bot.y != bot.next_index -> second) {
+                    f1 << "re find!" << endl;
+                    bot.zt = 3;
+                    break;
+                }
+                else{
+                    bot.current_index = bot.next_index;
+                }
+                // 系统确认到达目的地
+                if(bot.x == bot.path.back().first && bot.y == bot.path.back().second){
+                    // 可以进行小判断，如果已经机器人已经放下，就进入状态0，没拾取重新拾取，提前一帧
+                    if(bot.goods == 0) {
+                        bot.zt = 0;
+                    }
+                    else{
+                        printf("pull %d\n", bot_num);
+                        bot.zt = 5;
+                    }
+                    break;
+                }
+                bot.next_index = next(bot.current_index);
+                int direction = GetDirection(*bot.current_index, *bot.next_index);
+                printf("move %d %d\n", bot_num, direction);
+                // 提前放下
+                if(bot.next_index == bot.path.end()) {
+                    printf("pull %d\n", bot_num);
+                }
+                break;
+            }
+            case 5:{
+                f1 << bot_num << ' ' << 5 << endl;
+                // 被提前放下
+                if(bot.goods == 0) {
+                    bot.zt = 0;
+                }
+                else{
+                    printf("pull %d\n", bot_num);
+                }
+                break;
+            }
+            case 6:{
+                f1 << bot_num << ' ' << 6 << endl;
+                // 机器人恢复了
+                if(bot.status==1){
+                    if(bot.goods == 1){
+                        bot.zt = 3;
+                    }
+                    else{
+                        bot.zt = 0;
+                    }
+                }
+                break;
             }
             default:
                 break;
             }
             
         }
-
-        
         puts("OK");
         fflush(stdout);
     }
