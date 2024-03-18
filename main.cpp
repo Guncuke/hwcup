@@ -180,7 +180,7 @@ bool AStarSearch(Item target, int robot_index) {
 
         if (current.x == target.x && current.y == target.y) {
             // 保存路径
-            for (Node p = current; p.x != start_x && p.y != start_y; p = parents[p.x][p.y]) {
+            for (Node p = current; p.x != start_x || p.y != start_y; p = parents[p.x][p.y]) {
                 paths[robot_index].push_front({p.x, p.y});
             }
             paths[robot_index].push_front({start_x, start_y});
@@ -231,23 +231,24 @@ int main()
     {
         int id = Input();
         // 机器人部分
+        // 因为时间限制，每一轮能A*的机器人数量需要限制
+        int astar_time = 0;
         for(int bot_num = 0; bot_num < robot_num; bot_num++){
             // 机器人包括五个状态
             // 0:寻找去货物的最短路 1:运输途中 2: 到达货物点 3: 寻找到泊位的最短路 4: 到达泊位
             switch (robot[bot_num].zt)
             {
+            // 所有机器人的初始状态，没有物品，寻路去找物品
             case 0:{
+                if(astar_time > 1) break;
+                astar_time ++;
                 // 遍历所有货物
                 int count = 0;
                 for(auto it = items_set.begin(); it != items_set.end(); it ++) {
                     if(count > 5) break;
                     if(robot[bot_num].goods == 0) {
                         if(AStarSearch(*it, bot_num)) {
-                            // 将路径和移动写入f1
-                            for(auto it = paths[bot_num].begin(); it != paths[bot_num].end(); it ++) {
-                                f1 << "move " << bot_num << " " << it -> first << " " << it -> second << endl;
-                            }
-                            f1 << "\n";
+                            // 如果寻到路径，这里不break switch，在当前帧进入状态1
                             robot[bot_num].zt = 1;
                             current_index[bot_num] = paths[bot_num].begin();
                             items_set.erase(it);
@@ -265,6 +266,7 @@ int main()
             case 1:{
                 // 出现了丢帧
                 if(robot[bot_num].x != current_index[bot_num] -> first && robot[bot_num].y != current_index[bot_num] -> second) {
+                    f1 << "re find!" << endl;
                     paths[bot_num].clear();
                     current_index[bot_num] = paths[bot_num].begin();
                     robot[bot_num].zt = 0;
@@ -272,39 +274,43 @@ int main()
                 }
                 // 系统确认到达目的地
                 if(robot[bot_num].x == paths[bot_num].back().first && robot[bot_num].y == paths[bot_num].back().second){
-                    // 拾取失败
-                    if(robot[bot_num].goods == 0) {
-                        
-                    }
+                    // TODO:可以进行小判断，如果已经机器人已经拾取，就进入状态3，没拾取重新拾取，提前一帧
                     robot[bot_num].zt = 2;
-                    printf("get %d\n", bot_num);
                     break;
                 }
                 current_index[bot_num] ++;
                 int direction = get_direction({robot[bot_num].x, robot[bot_num].y}, *current_index[bot_num]);
+                f1 << "move " << bot_num << " " << direction << endl;
                 printf("move %d %d\n", bot_num, direction);
-                // 如果向后走这一步到了终点，可以提前拾取
+                // 提前拾取
                 if(current_index[bot_num] == paths[bot_num].end()) {
                     printf("get %d\n", bot_num);
                 }
+                break;
 
             }
+            // 能进入状态2，就是已经站在物品点了
             case 2:{
-                // 成功拾起
+                // 被提前拾取
                 if(robot[bot_num].goods == 1) {
                     robot[bot_num].zt = 3;
                 }
-                // 装货
-                if(gds[robot[bot_num].x][robot[bot_num].y] != 0) {
-                    robot[bot_num].goods = 0;
-                    gds[robot[bot_num].x][robot[bot_num].y] = 0;
-                    robot[bot_num].zt = 3;
-                    break;
+                else{
+                    if(gds[robot[bot_num].x][robot[bot_num].y] != 0) {
+                        printf("get %d\n", bot_num);
+                    }
+                    // 物品消失，重新寻路
+                    else{
+                        robot[bot_num].zt = 0;
+                    }
                 }
+                break;
             }
+            // 去泊位，能进入状态3，就是已经有物品了
             case 3:{
-
+                
             }
+            // 进入状态4，说明已经到达泊位
             case 4:{
 
             }
