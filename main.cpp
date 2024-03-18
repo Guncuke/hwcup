@@ -16,10 +16,9 @@ const int dys[] = {1, -1, 0, 0};
 char ch[N][N];
 int gds[N][N];
 // 十个机器人的路径
-list<int> paths[10];
-list<pair<int, int>> paths_road[10];
+list<pair<int, int>> paths[10];
 // 当前路径的迭代器
-list<int>::iterator current_index[10];
+list<pair<int, int>>::iterator current_index[10];
 
 struct Robot
 {
@@ -120,12 +119,15 @@ int Input()
         // 新增物品的位置和价值
         int x, y, val;
         scanf("%d%d%d", &x, &y, &val);
+        gds[x+1][y+1] = val;
         Item item = Item(x+1, y+1, val, id);
         items_exist.push_back(item);
         items_set.insert(item);
     }
     while(!items_exist.empty() && items_exist.front().appear_frame <= id - 1000) {
-        items_set.erase(items_set.find(items_exist.front()));
+        Item item_del = items_exist.front();
+        items_set.erase(items_set.find(item_del));
+        gds[item_del.x][item_del.y] = 0;
         items_exist.pop_front();
     }
 
@@ -169,13 +171,6 @@ bool AStarSearch(Item target, int robot_index) {
     bool closed_list[N][N] = {false};
     // 用来获得路径
     Node parents[N][N];
-    for(int i = 1; i <= n; i++) 
-	{
-		for(int j = 1; j <= n; j++) {
-			parents[i][j] = {-1, -1};
-		}
-	}
-    int directions[N][N];
     int start_x = robot[robot_index].x, start_y = robot[robot_index].y;
     open_list.push({start_x, start_y, 0, Heuristic(start_x, start_y, target.x, target.y), {-1, -1}});
 
@@ -185,12 +180,10 @@ bool AStarSearch(Item target, int robot_index) {
 
         if (current.x == target.x && current.y == target.y) {
             // 保存路径
-            for (Node p = current; p.x != -1 && p.y != -1; p = parents[p.x][p.y]) {
-                paths_road[robot_index].push_front({p.x, p.y});
-                paths[robot_index].push_front(directions[p.x][p.y]);
+            for (Node p = current; p.x != start_x && p.y != start_y; p = parents[p.x][p.y]) {
+                paths[robot_index].push_front({p.x, p.y});
             }
-            // 路径长度为n的话，操作就是n-1次
-            paths[robot_index].pop_front();
+            paths[robot_index].push_front({start_x, start_y});
             return true;
         }
 
@@ -203,14 +196,30 @@ bool AStarSearch(Item target, int robot_index) {
         for (int i = 0; i < 4; i++) {
             int nx = current.x + dxs[i];
             int ny = current.y + dys[i];
-            if (nx >= 1 && nx < 201 && ny >= 1 && ny < 201 && !closed_list[nx][ny] && ch[nx][ny] == '.') {
+            if (nx >= 1 && nx < 201 && ny >= 1 && ny < 201 && !closed_list[nx][ny] && ch[nx][ny] != '*' && ch[nx][ny] != '#') {
                 parents[nx][ny] = current;
-                directions[nx][ny] = i;
                 open_list.push({nx, ny, current.g + 1, Heuristic(nx, ny, target.x, target.y), {current.x, current.y}});
             }
         }
     }
     return false;
+}
+
+int get_direction(pair<int, int> a, pair<int, int> b) {
+    // a:当前坐标 b:下一时刻
+    if(a.first == b.first) {
+        if(a.second < b.second) {
+            return 0;
+        } else {
+            return 1;
+        }
+    } else {
+        if(a.first < b.first) {
+            return 3;
+        } else {
+            return 2;
+        }
+    }
 }
 
 int main()
@@ -221,7 +230,6 @@ int main()
     for(int zhen = 1; zhen <= 15000; zhen ++)
     {
         int id = Input();
-
         // 机器人部分
         for(int bot_num = 0; bot_num < robot_num; bot_num++){
             // 机器人包括五个状态
@@ -236,7 +244,7 @@ int main()
                     if(robot[bot_num].goods == 0) {
                         if(AStarSearch(*it, bot_num)) {
                             // 将路径和移动写入f1
-                            for(auto it = paths_road[bot_num].begin(); it != paths_road[bot_num].end(); it ++) {
+                            for(auto it = paths[bot_num].begin(); it != paths[bot_num].end(); it ++) {
                                 f1 << "move " << bot_num << " " << it -> first << " " << it -> second << endl;
                             }
                             f1 << "\n";
@@ -255,15 +263,44 @@ int main()
                 }
             }
             case 1:{
-                int direction = *current_index[bot_num];
-                printf("move %d %d\n", bot_num, direction);
-                current_index[bot_num] ++;
-                if(current_index[bot_num] == paths[bot_num].end()) {
-                    robot[bot_num].zt = 2;
+                // 出现了丢帧
+                if(robot[bot_num].x != current_index[bot_num] -> first && robot[bot_num].y != current_index[bot_num] -> second) {
+                    paths[bot_num].clear();
+                    current_index[bot_num] = paths[bot_num].begin();
+                    robot[bot_num].zt = 0;
+                    break;
                 }
+                // 系统确认到达目的地
+                if(robot[bot_num].x == paths[bot_num].back().first && robot[bot_num].y == paths[bot_num].back().second){
+                    // 拾取失败
+                    if(robot[bot_num].goods == 0) {
+                        
+                    }
+                    robot[bot_num].zt = 2;
+                    printf("get %d\n", bot_num);
+                    break;
+                }
+                current_index[bot_num] ++;
+                int direction = get_direction({robot[bot_num].x, robot[bot_num].y}, *current_index[bot_num]);
+                printf("move %d %d\n", bot_num, direction);
+                // 如果向后走这一步到了终点，可以提前拾取
+                if(current_index[bot_num] == paths[bot_num].end()) {
+                    printf("get %d\n", bot_num);
+                }
+
             }
             case 2:{
-
+                // 成功拾起
+                if(robot[bot_num].goods == 1) {
+                    robot[bot_num].zt = 3;
+                }
+                // 装货
+                if(gds[robot[bot_num].x][robot[bot_num].y] != 0) {
+                    robot[bot_num].goods = 0;
+                    gds[robot[bot_num].x][robot[bot_num].y] = 0;
+                    robot[bot_num].zt = 3;
+                    break;
+                }
             }
             case 3:{
 
