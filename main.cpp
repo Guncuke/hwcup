@@ -27,6 +27,7 @@ struct Robot
     int status;
     int mbx, mby;
     int zt;
+    // 机器人目标泊位
     int target_berth;
     // 机器人身上物品的价值
     int value;
@@ -73,8 +74,7 @@ struct Boat
     // num: 当前装载量
     // status: 0: 运输中 1: 装货或运输完成 2:泊位外等待
     // pos: 目标泊位
-    // arrive_time: 到达时间
-    int num=0, pos, status, arrive_time;
+    int num=0, pos, status;
     Boat(){}
     Boat(int num, int pos, int status) {
         this -> num = num;
@@ -182,6 +182,8 @@ int HeuristicItem(int x, int y, int xx, int yy)
     return abs(x - xx) + abs(y - yy);
 }
 
+// 冲突解决方案
+// A*拓展节点对应步与已有路径不冲突
 bool Collision(int x1, int y1, int x2, int y2, int g, int bot_id){
     // 其他机器人在第g步的预测值
     int predict_x1, predict_y1, predict_x2, predict_y2;
@@ -385,7 +387,6 @@ int main()
                     if(count > 5) break;
                     if(AStarSearchItem(*it, bot, bot_num)) {
                         bot.zt = 1;
-                        bot.value += it -> val;
                         items_set.erase(it);
                         break;
                     }
@@ -423,8 +424,10 @@ int main()
             }
             // 状态2：到达物品点
             case 2:{
-                // 被提前拾取
+                // 被拾取
                 if(bot.goods == 1) {
+                    bot.value = gds[bot.mbx][bot.mby];
+                    gds[bot.mbx][bot.mby] = 0;
                     bot.zt = 3;
                 }
                 else{
