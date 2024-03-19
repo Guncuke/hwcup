@@ -10,8 +10,10 @@ const int boat_num = 5;
 const int N = 210;
 const int dxs[] = {0, 0, -1, 1};
 const int dys[] = {1, -1, 0, 0};
+// 一个机器人如果失败max_astar_fail次，就不再寻路
 const int max_astar_fail = 20;
-const int max_astar_time = 3;
+// 每一帧可以做的A*次数
+const int max_astar_time = 2;
 // 金钱，船只容量，当前帧数
 int money, boat_capacity, id;
 // 地图
@@ -339,7 +341,7 @@ int main()
         int id = Input();
         // 机器人部分
         // 首先要判断服务器是否正确移动，如果没有正确移动，回到寻路状态
-        // 是否状态正常
+        // 然后判断机器人是否处于正常状态，如果处于恢复状态去状态6
         for(int i = 0; i < robot_num; i ++)
         {
             Robot& bot = robot[i];
@@ -361,7 +363,6 @@ int main()
             }
         }
         // 之后，所有处于寻路状态的机器人位置都正确，位于current_index上
-        // 为了不跳帧与同步，我们每一轮只计算一次A*，即每一帧只有一个机器人能寻到路
         int astar_time = 0;
         for(int bot_num = 0; bot_num < robot_num; bot_num++){
             Robot& bot = robot[bot_num];
@@ -369,7 +370,7 @@ int main()
             // 0:寻找去货物的最短路 1:运输途中 2: 到达货物点 3: 寻找到泊位的最短路 4：去往泊位 5: 到达泊位 6：恢复状态
             switch (bot.zt)
             {
-            // 所有机器人的初始状态，没有物品，寻路去找物品
+            // 状态0：寻路物品
             case 0:{
                 find_item:
                 if(bot.astar_fail >= max_astar_fail) break;
@@ -398,7 +399,7 @@ int main()
                 }
                 // 正常找到路径，此帧可以继续走一步，不break
             }
-            // 去物品点状态
+            // 状态2：去物品点途中
             case 1:{
                 // 系统确认到达目的地
                 if(bot.x == bot.path.back().first && bot.y == bot.path.back().second){
@@ -420,7 +421,7 @@ int main()
                     break;
                 }
             }
-            // 能进入状态2，就是已经站在物品点了
+            // 状态2：到达物品点
             case 2:{
                 // 被提前拾取
                 if(bot.goods == 1) {
@@ -438,7 +439,7 @@ int main()
                     break;
                 }
             }
-            // 寻找泊位，能进入状态3，就是已经有物品了
+            // 状态3：寻找泊位
             case 3:{
                 find_berth:
                 if(astar_time >= max_astar_time) break;
@@ -461,7 +462,7 @@ int main()
                 }
                 // 寻到路径直接进入状态4
             }
-            // 去泊位状态
+            // 状态4：去泊位途中
             case 4:{
                 // 系统确认到达目的地
                 if(bot.x == bot.path.back().first && bot.y == bot.path.back().second){
@@ -478,6 +479,7 @@ int main()
                     break;
                 }
             }
+            // 状态5：到达泊位
             case 5:{
                 // 被放下
                 if(bot.goods == 0) {
@@ -492,6 +494,7 @@ int main()
                     break;
                 }
             }
+            // 状态6：恢复状态
             case 6:{
                 // 机器人恢复正常
                 if(bot.status==1){
