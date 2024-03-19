@@ -200,17 +200,17 @@ bool Collision(int x1, int y1, int x2, int y2, int g, int bot_id){
                     return false;
                 }
                 // 左右对撞
-                if(x1 == x2 && predict_x1 == predict_x2 && predict_x1 == x1 && y2 == predict_y1 && y1 == predict_y2){
+                if(x1 == predict_x1 && x2 == predict_x2 && y2 == predict_y1 && y1 == predict_y2){
                     return false;
                 }
                 // 上下对撞
-                if(y1 == y2 && predict_y1 == predict_y2 && predict_y1 == y1 && x2 == predict_x1 && x1 == predict_x2){
+                if(y1 == predict_y1 && y2 == predict_y2 && x2 == predict_x1 && x1 == predict_x2){
                     return false;
                 }
             }
         }
         else{
-            if(x2 == robot[i].x && y2 == robot[i].y || x1 == robot[i].x && y1 == robot[i].y)
+            if(x2 == robot[i].x && y2 == robot[i].y)
                 return false;
         }
     }
