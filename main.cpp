@@ -290,7 +290,6 @@ int main()
     for(int zhen = 1; zhen <= 15000; zhen ++)
     {
         int id = Input();
-        f1 << "id: " << id << endl;
         // 机器人部分
         // 因为时间限制，每一轮能A*的机器人数量需要限制
         int astar_time = 0;
@@ -306,7 +305,6 @@ int main()
             {
             // 所有机器人的初始状态，没有物品，寻路去找物品
             case 0:{
-                f1 << bot_num << ' ' << 0 << endl;
                 if(astar_time > 3) break;
                 astar_time ++;
                 int count = 0;
@@ -330,7 +328,6 @@ int main()
             }
             // 去物品点状态
             case 1:{
-                f1 << bot_num << ' '<< 1 << endl;
                 // 出现了与预测不符的情况，重新寻路
                 if(bot.x != bot.next_index -> first && bot.y != bot.next_index -> second) {
                     f1 << "re find!" << endl;
@@ -354,6 +351,8 @@ int main()
                 }
                 bot.next_index = next(bot.current_index);
                 int direction = GetDirection(*bot.current_index, *bot.next_index);
+                if(bot_num==0)
+                    f1 << "move " << bot_num << " " << direction << endl;
                 printf("move %d %d\n", bot_num, direction);
                 // 提前拾取
                 if(bot.next_index == bot.path.end()) {
@@ -363,7 +362,6 @@ int main()
             }
             // 能进入状态2，就是已经站在物品点了
             case 2:{
-                f1 << bot_num << ' ' << 2 << endl;
                 // 被提前拾取
                 if(bot.goods == 1) {
                     bot.zt = 3;
@@ -381,7 +379,6 @@ int main()
             }
             // 寻找泊位，能进入状态3，就是已经有物品了
             case 3:{
-                f1 << bot_num << ' ' << 3 << endl;
                 if(astar_time > 3) break;
                 astar_time ++;
                 int count = 0;
@@ -404,7 +401,6 @@ int main()
             }
             // 去泊位状态
             case 4:{
-                f1 << bot_num << ' ' << 4 << endl;
                 // 出现了与预测不符的情况，重新寻路
                 if(bot.x != bot.next_index -> first && bot.y != bot.next_index -> second) {
                     f1 << "re find!" << endl;
@@ -437,7 +433,6 @@ int main()
                 break;
             }
             case 5:{
-                f1 << bot_num << ' ' << 5 << endl;
                 // 被放下
                 if(bot.goods == 0) {
                     bot.zt = 0;
@@ -449,7 +444,6 @@ int main()
                 break;
             }
             case 6:{
-                f1 << bot_num << ' ' << 6 << endl;
                 // 机器人恢复了
                 if(bot.status==1){
                     if(bot.goods == 1){
