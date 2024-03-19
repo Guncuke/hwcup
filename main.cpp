@@ -190,13 +190,7 @@ bool Collision(int x1, int y1, int x2, int y2, int g, int bot_id){
     for(int i = 0; i < robot_num; i++){
         if(i == bot_id) continue;
         if(robot[i].zt == 1 || robot[i].zt == 4){
-            if(robot[i].current_index+g+1 >= robot[i].path.size()){
-                if(x2 == robot[i].path.back().first && y2 == robot[i].path.back().second 
-                 ||x1 == robot[i].path.back().first && y1 == robot[i].path.back().second){
-                    return false;
-                }
-            }
-            else{
+            if(robot[i].current_index+g+1 < robot[i].path.size()){
                 predict_x1 = robot[i].path[robot[i].current_index+g].first;
                 predict_y1 = robot[i].path[robot[i].current_index+g].second;
                 predict_x2 = robot[i].path[robot[i].current_index+g+1].first;
@@ -206,11 +200,11 @@ bool Collision(int x1, int y1, int x2, int y2, int g, int bot_id){
                     return false;
                 }
                 // 左右对撞
-                if(x1 == predict_x1 && x2 == predict_x2 && y2 == predict_y1 && y1 == predict_y2){
+                if(x1 == x2 && predict_x1 == predict_x2 && predict_x1 == x1 && y2 == predict_y1 && y1 == predict_y2){
                     return false;
                 }
                 // 上下对撞
-                if(y1 == predict_y1 && y2 == predict_y2 && x2 == predict_x1 && x1 == predict_x2){
+                if(y1 == y2 && predict_y1 == predict_y2 && predict_y1 == y1 && x2 == predict_x1 && x1 == predict_x2){
                     return false;
                 }
             }
@@ -347,6 +341,7 @@ int main()
     for(int zhen = 1; zhen <= 15000; zhen ++)
     {
         int id = Input();
+        f1 << "id: " << id << endl;
         // 机器人部分
         // 首先要判断服务器是否正确移动，如果没有正确移动，回到寻路状态
         // 然后判断机器人是否处于正常状态，如果处于恢复状态去状态6
@@ -359,11 +354,11 @@ int main()
                 bot.clearPath();
                 continue;
             }
-            if(robot[i].zt == 1 || robot[i].zt == 4) {
+            if(bot.zt == 1 || bot.zt == 4) {
                 // 机器人没有移动，重新寻路
                 if(bot.x != bot.path[bot.current_index+1].first || bot.y != bot.path[bot.current_index+1].second) {
                     f1 << "before re find!" << endl;
-                    bot.zt = robot[i].zt-1;
+                    bot.zt--;
                     continue;
                 }
                 // 正常移动
@@ -381,14 +376,15 @@ int main()
             // 状态0：寻路物品
             case 0:{
                 find_item:
+                f1 << bot_num << " " << 0 << endl;
+                bot.clearPath();
                 if(bot.astar_fail >= max_astar_fail) break;
                 if(astar_time >= max_astar_time) break;
                 astar_time ++;
                 int count = 0;
-                bot.clearPath();
                 // TODO: 估算物品距离和价值，综合排序（优先队列）
                 // 绝对值距离如果超出剩余帧数，就不用寻路了
-                // 根据观察可以发现，场上同时出现的物品不会太多，在200个以内
+                // 根据观察可以发现，场上同时出现的物品不会太多，在100个以内
                 for(auto it = items_set.begin(); it != items_set.end(); it ++) {
                     if(count > 5) break;
                     if(AStarSearchItem(*it, bot, bot_num)) {
@@ -408,6 +404,7 @@ int main()
             }
             // 状态2：去物品点途中
             case 1:{
+                f1 << bot_num << " " << 1 << endl;
                 // 系统确认到达目的地
                 if(bot.x == bot.path.back().first && bot.y == bot.path.back().second){
                     bot.zt = 2;
@@ -430,6 +427,7 @@ int main()
             }
             // 状态2：到达物品点
             case 2:{
+                f1 << bot_num << " " << 2 << endl;
                 // 被拾取
                 if(bot.goods == 1) {
                     bot.value = gds[bot.mbx][bot.mby];
@@ -451,10 +449,11 @@ int main()
             // 状态3：寻找泊位
             case 3:{
                 find_berth:
+                f1 << bot_num << " " << 3 << endl;
+                bot.clearPath();
                 if(astar_time >= max_astar_time) break;
                 astar_time ++;
                 int count = 0;
-                bot.clearPath();
                 // TODO: 估算泊位距离和价值，综合计算选出最优可达的泊位（优先队列？）
                 for(int i = 0; i < berth_num; i ++){
                     if(count > 5) break;
@@ -473,6 +472,7 @@ int main()
             }
             // 状态4：去泊位途中
             case 4:{
+                f1 << bot_num << " " << 4 << endl;
                 // 系统确认到达目的地
                 if(bot.x == bot.path.back().first && bot.y == bot.path.back().second){
                     bot.zt = 5;
@@ -490,6 +490,7 @@ int main()
             }
             // 状态5：到达泊位
             case 5:{
+                f1 << bot_num << " " << 5 << endl;
                 // 被放下
                 if(bot.goods == 0) {
                     bot.zt = 0;
@@ -505,6 +506,7 @@ int main()
             }
             // 状态6：恢复状态
             case 6:{
+                f1 << bot_num << " " << 6 << endl;
                 // 机器人恢复正常
                 if(bot.status==1){
                     if(bot.goods == 1){
