@@ -201,10 +201,16 @@ bool Collision(int x1, int y1, int x2, int y2, int g, int bot_id){
                 predict_y1 = robot[i].path[robot[i].current_index+g].second;
                 predict_x2 = robot[i].path[robot[i].current_index+g+1].first;
                 predict_y2 = robot[i].path[robot[i].current_index+g+1].second;
+                // 直接撞上
                 if(x2 == predict_x2 && y2 == predict_y2){
                     return false;
                 }
-                if(x2 == predict_x1 && y2 == predict_y1 && x1 == predict_x2 && y1 == predict_y2){
+                // 左右对撞
+                if(x1 == predict_x1 && x2 == predict_x2 && y2 == predict_y1 && y1 == predict_y2){
+                    return false;
+                }
+                // 上下对撞
+                if(y1 == predict_y1 && y2 == predict_y2 && x2 == predict_x1 && x1 == predict_x2){
                     return false;
                 }
             }
