@@ -432,8 +432,8 @@ int main()
                     return -(abs(bot.x-a.x) + abs(bot.y-a.y)) * quanzhong_distance + a.val * quanzhong_value > -(abs(bot.x-b.x) + abs(bot.y-b.y)) * quanzhong_distance + b.val * quanzhong_value;
                 });
                 for(auto it = items.begin(); it != items.end(); it ++) {
-                    // 如果剩余帧数比最短路还要少，跳过 预留100帧
-                    if((abs(bot.x-it->x) + abs(bot.y-it->y)) > (900 - (id - it->appear_frame))) continue;
+                    // 如果剩余帧数比最短路还要少，跳过 预留50帧
+                    if((abs(bot.x-it->x) + abs(bot.y-it->y)) > (950 - (id - it->appear_frame))) continue;
                     if(AStarSearchItem(*it, bot, bot_num)) {
                         bot.zt = 1;
                         bot.bot_item = *it;
@@ -449,10 +449,10 @@ int main()
             // 状态2：去物品点途中
             case 1:{
                 // 每10帧重新计算一次，附近有没有更好的物品。
-                if((bot.current_index+1) % 5 == 0) {
-                    bot.zt = 0;
-                    goto find_item;
-                }
+                // if((bot.current_index+1) % 10 == 0) {
+                //     bot.zt = 0;
+                //     goto find_item;
+                // }
                 // 系统确认到达目的地
                 if(bot.x == bot.path.back().first && bot.y == bot.path.back().second){
                     bot.zt = 2;
