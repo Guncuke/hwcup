@@ -10,13 +10,13 @@ const int boat_num = 5;
 const int N = 210;
 const int dxs[] = {0, 0, -1, 1};
 const int dys[] = {1, -1, 0, 0};
-// 一个机器人如果失败max_astar_fail次，就不再寻路
-const int max_astar_fail = 50;
-// 每一帧可以做的A*次数
-const int max_astar_time = 10;
 // 物品平衡二叉树排序的权重
-const float quanzhou_distance = 2;
-const float quanzhou_value = 0.1;
+const float quanzhong_distance = 50;
+const float quanzhong_value = 0.1;
+// 泊位效率，金钱，和时间的权重
+const float quanzhong_efficiency = 100;
+const float quanzhong_money = 1;
+const float quanzhong_time = 2;
 // 金钱，船只容量，当前帧数
 int money, boat_capacity, id;
 // 泊位中心点
@@ -25,8 +25,7 @@ int berth_center[10][2];
 char ch[N][N];
 // 物品位置
 int gds[N][N];
-// 泊位优先级
-vector<Berth> berth_priority(berth_num);
+
 
 
 
@@ -43,8 +42,6 @@ struct Robot
     // 当前机器人的路径和当前位置
     vector<pair<int, int>> path;
     int current_index=-1;
-    // A星失败次数
-    int astar_fail;
     Robot() {}
     Robot(int startX, int startY) {
         x = startX;
@@ -58,6 +55,7 @@ struct Robot
 
 struct Berth
 {   
+    int id;
     // 泊位左上角位置，泊位大小4*4
     int x;
     int y;
@@ -67,6 +65,8 @@ struct Berth
     int loading_speed;
     // 泊位上的物品价值链表
     deque<int> items;
+    // 总价值
+    int total_value;
     // 是否被占用(有船在装卸和有船前往都算被占用)
     bool is_occupied;
     Berth(){}
@@ -78,6 +78,8 @@ struct Berth
     }
 }berth[berth_num + 10];
 
+// 泊位优先级
+vector<Berth> berth_priority(berth_num);
 
 struct Boat
 {   
@@ -123,6 +125,7 @@ void Init()
     {
         int id;
         scanf("%d", &id);
+        berth[id].id = id;
         scanf("%d%d%d%d", &berth[id].x, &berth[id].y, &berth[id].transport_time, &berth[id].loading_speed);
         berth[id].x ++;
         berth[id].y ++;
@@ -130,7 +133,6 @@ void Init()
     scanf("%d", &boat_capacity);
     char okk[100];
     scanf("%s", okk);
-    f1 << boat_capacity << endl;
     // 泊位中心
     for(int i =0; i < berth_num; i++){
         berth_center[i][0] = berth[i].x + 2;
@@ -412,7 +414,6 @@ int main()
             }
         }
         // 之后，所有处于寻路状态的机器人位置都正确，位于current_index上
-        int astar_time = 0;
         for(int bot_num = 0; bot_num < robot_num; bot_num++){
             Robot& bot = robot[bot_num];
             // 机器人包括6个状态
@@ -423,29 +424,22 @@ int main()
             case 0:{
                 find_item:
                 bot.clearPath();
-                if(bot.astar_fail >= max_astar_fail) break;
-                if(astar_time >= max_astar_time) break;
-                // TODO: items_set是一个平衡二叉树，不会超过100个物品，直接遍历，获得物品的位置，价格和剩余帧数
+                // items_set是一个平衡二叉树，不会超过100个物品，直接遍历，获得物品的位置，价格和剩余帧数
+                // TODO: 调节价值和距离的权重
                 vector<Item> items(items_set.begin(), items_set.end());
 
                 // 排序
                 sort(items.begin(), items.end(), [&](const Item& a, const Item& b) {
-                    return -(abs(bot.x-a.x) + abs(bot.y-a.y)) * quanzhou_distance + a.val * quanzhou_value > -(abs(bot.x-b.x) + abs(bot.y-b.y)) * quanzhou_distance + b.val * quanzhou_value;
+                    return -(abs(bot.x-a.x) + abs(bot.y-a.y)) * quanzhong_distance + a.val * quanzhong_value > -(abs(bot.x-b.x) + abs(bot.y-b.y)) * quanzhong_distance + b.val * quanzhong_value;
                 });
-
                 for(auto it = items.begin(); it != items.end(); it ++) {
-                    if(astar_time  > max_astar_time) break;
                     // 如果剩余帧数比最短路还要少，跳过 预留100帧
                     if((abs(bot.x-it->x) + abs(bot.y-it->y)) > (900 - (id - it->appear_frame))) continue;
                     if(AStarSearchItem(*it, bot, bot_num)) {
                         bot.zt = 1;
                         items_set.erase(*it);
-                        astar_time ++;
                         break;
                     }
-                    astar_time ++;
-                    // A星失败次数
-                    bot.astar_fail++;
                 }
                 // 没有找到最短路，跳过此机器人
                 if(bot.zt == 0) {
@@ -499,9 +493,8 @@ int main()
             case 3:{
                 find_berth:
                 bot.clearPath();
-                if(astar_time >= max_astar_time) break;
-                // TODO:估算泊位距离和价值，综合计算选出最优可达的泊位
-                // 现在直接按距离排序
+                // 估算泊位距离和价值，综合计算选出最优可达的泊位
+                // TODO: 现在直接按距离排序，后续可能得加上泊位装载速度
                 vector<pair<int, int>> berth_distance(10);
                 for(int i = 0; i < berth_num; i ++){
                     berth_distance[i].first = abs(bot.x - berth_center[i][0]) + abs(bot.y - berth_center[i][1]);
@@ -509,14 +502,11 @@ int main()
                 }
                 sort(berth_distance.begin(), berth_distance.end());
                 for(int i = 0; i < berth_num; i ++){
-                    if(astar_time > max_astar_time) break;
                     if(AStarSearchBerth(berth[berth_distance[i].second], bot, bot_num)) {
                         bot.zt = 4;
                         bot.target_berth = berth_distance[i].second;
-                        astar_time ++; 
                         break;
                     }
-                    astar_time ++;
                 }
                 // 没有找到最短路，跳过此机器人
                 if(bot.zt == 3) {
@@ -546,8 +536,9 @@ int main()
                 // 被放下
                 if(bot.goods == 0) {
                     bot.zt = 0;
-                    bot.value = 0;
                     berth[bot.target_berth].items.push_back(bot.value);
+                    berth[bot.target_berth].total_value += bot.value;
+                    bot.value = 0;
                     goto find_item;
                 }
                 else{
@@ -576,22 +567,37 @@ int main()
             
         }
 
-        // TODO: 船只部分
         // 0: 移动 1: 正常 2:等待
         // 出发选择
+        // 将berth_priority复制一份，用于排序
+        for(int i = 0; i < berth_num; i++){
+            berth_priority[i] = berth[i];
+        }
+        // 根据泊位价值/效率/时间排序
+        sort(berth_priority.begin(), berth_priority.end(), [&](const Berth& a, const Berth& b) {
+            return a.total_value * quanzhong_money + a.loading_speed * quanzhong_efficiency - a.transport_time * quanzhong_time > b.total_value * quanzhong_money + b.loading_speed * quanzhong_efficiency - b.transport_time * quanzhong_time;
+        });
+
         for(int i = 0; i < boat_num; i++){
-            // 如果在虚拟点，通过1.泊位价值+2.路径花费时间+3.装载速度 决定去哪个泊位
+            // TODO: 如果在虚拟点，通过1.泊位价值+2.路径花费时间+3.装载速度 决定去哪个泊位
             if(boat[i].status == 1 && boat[i].pos== -1) {
                 boat[i].num = 0;
-                printf("ship %d %d\n", i, i);
+                for(int j = 0; j < berth_num; j++){
+                    // 被占用的泊位不考虑
+                    if(berth[berth_priority[j].id].is_occupied) continue;
+                    berth[berth_priority[j].id].is_occupied = true;
+                    printf("ship %d %d\n", i, berth_priority[j].id);
+                    break;
+                }
             }
         }
 
-        // 
+        // 泊位装货，维持泊位信息与出发
         for(int i = 0; i < boat_num; i ++)
         {   
             // 在泊位
             if(boat[i].status == 1 && boat[i].pos != -1) {
+                berth[boat[i].pos].is_occupied = true;
                 int target_berth = boat[i].pos;
                 // 泊位没有货物，等待
                 if(berth[target_berth].items.size() == 0){
@@ -600,18 +606,23 @@ int main()
                 // 有货物，装载
                 else{
                     // 泊位可以给那么多
-                    int upload_num = min(berth[target_berth].loading_speed, berth[target_berth].items_num);
+                    int upload_num = min(berth[target_berth].loading_speed, (int)berth[target_berth].items.size());
                     // 船上还能装多少
                     upload_num = min(upload_num, boat_capacity - boat[i].num);
                     boat[i].num += upload_num;
-                    berth[target_berth].items_num -= upload_num;
+                    for(int j = 0; j < upload_num; j ++){
+                        berth[target_berth].total_value -= berth[target_berth].items.front();
+                        berth[target_berth].items.pop_front();
+                    }                    
                     // 货满了出发
                     if(boat[i].num == boat_capacity) {
+                        berth[boat[i].pos].is_occupied = false;
                         printf("go %d\n", i);
                         break;
                     }
-                    // 没货了，但是还没装一半
-                    if(berth[target_berth].items_num == 0 && boat[i].num > boat_capacity/2) {
+                    // 没货了，直接出发
+                    if(berth[target_berth].items.size() == 0) {
+                        berth[boat[i].pos].is_occupied = false;
                         printf("go %d\n", i);
                         break;
                     }
