@@ -11,11 +11,11 @@ const int N = 210;
 const int dxs[] = {0, 0, -1, 1};
 const int dys[] = {1, -1, 0, 0};
 // 一个机器人如果失败max_astar_fail次，就不再寻路
-const int max_astar_fail = 40;
+const int max_astar_fail = 50;
 // 每一帧可以做的A*次数
-const int max_astar_time = 2;
+const int max_astar_time = 10;
 // 物品平衡二叉树排序的权重
-const float quanzhou_distance = 3;
+const float quanzhou_distance = 2;
 const float quanzhou_value = 0.1;
 // 金钱，船只容量，当前帧数
 int money, boat_capacity, id;
@@ -25,6 +25,9 @@ int berth_center[10][2];
 char ch[N][N];
 // 物品位置
 int gds[N][N];
+// 泊位优先级
+vector<Berth> berth_priority(berth_num);
+
 
 
 struct Robot
@@ -62,14 +65,10 @@ struct Berth
     int transport_time;
     // 泊位装载速度
     int loading_speed;
-    // 泊位物品
-    int items_num=0;
-    // 泊位物品价值
-    int value;
-    // 是否被占用
-    int is_occupied;
-    // 是否有人正在前往
-    int is_going;
+    // 泊位上的物品价值链表
+    deque<int> items;
+    // 是否被占用(有船在装卸和有船前往都算被占用)
+    bool is_occupied;
     Berth(){}
     Berth(int x, int y, int transport_time, int loading_speed) {
         this -> x = x;
@@ -78,6 +77,7 @@ struct Berth
         this -> loading_speed = loading_speed;
     }
 }berth[berth_num + 10];
+
 
 struct Boat
 {   
@@ -103,6 +103,10 @@ struct Item
         this -> y = y;
         this -> val = val;
         this -> appear_frame = appear_frame;
+    }
+
+    bool operator<(const Item& rhs) const {
+        return val  > rhs.val;
     }
 };
 
@@ -421,14 +425,21 @@ int main()
                 bot.clearPath();
                 if(bot.astar_fail >= max_astar_fail) break;
                 if(astar_time >= max_astar_time) break;
-                // TODO: items_set是一个平衡二叉树，不会超过100个物品，直接遍历计算排序
-                for(auto it = items_set.begin(); it != items_set.end(); it ++) {
+                // TODO: items_set是一个平衡二叉树，不会超过100个物品，直接遍历，获得物品的位置，价格和剩余帧数
+                vector<Item> items(items_set.begin(), items_set.end());
+
+                // 排序
+                sort(items.begin(), items.end(), [&](const Item& a, const Item& b) {
+                    return -(abs(bot.x-a.x) + abs(bot.y-a.y)) * quanzhou_distance + a.val * quanzhou_value > -(abs(bot.x-b.x) + abs(bot.y-b.y)) * quanzhou_distance + b.val * quanzhou_value;
+                });
+
+                for(auto it = items.begin(); it != items.end(); it ++) {
                     if(astar_time  > max_astar_time) break;
                     // 如果剩余帧数比最短路还要少，跳过 预留100帧
                     if((abs(bot.x-it->x) + abs(bot.y-it->y)) > (900 - (id - it->appear_frame))) continue;
                     if(AStarSearchItem(*it, bot, bot_num)) {
                         bot.zt = 1;
-                        items_set.erase(it);
+                        items_set.erase(*it);
                         astar_time ++;
                         break;
                     }
@@ -536,8 +547,7 @@ int main()
                 if(bot.goods == 0) {
                     bot.zt = 0;
                     bot.value = 0;
-                    berth[bot.target_berth].items_num++;
-                    berth[bot.target_berth].value += bot.value;
+                    berth[bot.target_berth].items.push_back(bot.value);
                     goto find_item;
                 }
                 else{
@@ -566,21 +576,25 @@ int main()
             
         }
 
-
         // TODO: 船只部分
-        for(int i = 0; i < boat_num; i ++)
-        {   
+        // 0: 移动 1: 正常 2:等待
+        // 出发选择
+        for(int i = 0; i < boat_num; i++){
             // 如果在虚拟点，通过1.泊位价值+2.路径花费时间+3.装载速度 决定去哪个泊位
             if(boat[i].status == 1 && boat[i].pos== -1) {
                 boat[i].num = 0;
                 printf("ship %d %d\n", i, i);
             }
-            // 到达泊位
-            else if(boat[i].status == 1 && boat[i].pos != -1) {
-                // 目标泊位
+        }
+
+        // 
+        for(int i = 0; i < boat_num; i ++)
+        {   
+            // 在泊位
+            if(boat[i].status == 1 && boat[i].pos != -1) {
                 int target_berth = boat[i].pos;
-                // 泊位没有货物，此帧等待
-                if(berth[target_berth].items_num == 0){
+                // 泊位没有货物，等待
+                if(berth[target_berth].items.size() == 0){
                     break;
                 }
                 // 有货物，装载
