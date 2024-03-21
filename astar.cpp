@@ -11,7 +11,7 @@ const int N = 210;
 const int dxs[] = {0, 0, -1, 1};
 const int dys[] = {1, -1, 0, 0};
 // 物品平衡二叉树排序的权重
-const float quanzhong_distance = 1;
+const float quanzhong_distance = 10;
 const float quanzhong_value = 0.6;
 // 泊位效率，金钱，和时间的权重
 const float quanzhong_efficiency = 10;
