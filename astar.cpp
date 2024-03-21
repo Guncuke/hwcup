@@ -11,12 +11,12 @@ const int N = 210;
 const int dxs[] = {0, 0, -1, 1};
 const int dys[] = {1, -1, 0, 0};
 // 物品平衡二叉树排序的权重
-const float quanzhong_distance = 20;
+const float quanzhong_distance = 10;
 const float quanzhong_value = 0.1;
 // 泊位效率，金钱，和时间的权重
-const float quanzhong_efficiency = 100;
+const float quanzhong_efficiency = 10;
 const float quanzhong_money = 1;
-const float quanzhong_time = 2;
+const float quanzhong_time = 1;
 // 金钱，船只容量，当前帧数
 int money, boat_capacity, id;
 // 泊位中心点
@@ -118,7 +118,7 @@ void Init()
 {
     for(int i = 1; i <= n; i ++)
         scanf("%s", ch[i]+1);
-    
+
     // 读入泊位信息
     for(int i = 0; i < berth_num; i ++)
     {
@@ -432,8 +432,8 @@ int main()
                     return -(abs(bot.x-a.x) + abs(bot.y-a.y)) * quanzhong_distance + a.val * quanzhong_value > -(abs(bot.x-b.x) + abs(bot.y-b.y)) * quanzhong_distance + b.val * quanzhong_value;
                 });
                 for(auto it = items.begin(); it != items.end(); it ++) {
-                    // 如果剩余帧数比最短路还要少，跳过 预留50帧
-                    if((abs(bot.x-it->x) + abs(bot.y-it->y)) > (950 - (id - it->appear_frame))) continue;
+                    // 如果剩余帧数比最短路还要少，跳过 预留100帧
+                    if((abs(bot.x-it->x) + abs(bot.y-it->y)) > (900 - (id - it->appear_frame))) continue;
                     if(AStarSearchItem(*it, bot, bot_num)) {
                         bot.zt = 1;
                         bot.bot_item = *it;
@@ -566,7 +566,7 @@ int main()
             default:
                 break;
             }
-            
+
         }
 
         // 0: 移动 1: 正常 2:等待
@@ -580,16 +580,24 @@ int main()
             return a.total_value * quanzhong_money + a.loading_speed * quanzhong_efficiency - a.transport_time * quanzhong_time > b.total_value * quanzhong_money + b.loading_speed * quanzhong_efficiency - b.transport_time * quanzhong_time;
         });
 
+        // 每个泊位的船只数量（包括在路上和在泊位）
+        int boat_num_in_berth[10] = {0};
+        for(int i = 0; i < boat_num; i++){
+            if(boat[i].pos==-1) continue;
+            boat_num_in_berth[boat[i].pos]++;
+        }
+
         for(int i = 0; i < boat_num; i++){
             // TODO: 如果在虚拟点，通过1.泊位价值+2.路径花费时间+3.装载速度 决定去哪个泊位
             if(boat[i].status == 1 && boat[i].pos== -1) {
                 boat[i].num = 0;
                 for(int j = 0; j < berth_num; j++){
-                    // 被占用的泊位不考虑
-                    if(berth[berth_priority[j].id].is_occupied) continue;
-                    berth[berth_priority[j].id].is_occupied = true;
-                    printf("ship %d %d\n", i, berth_priority[j].id);
-                    break;
+                    if(berth[berth_priority[j].id].items.size()/boat_capacity >= boat_num_in_berth[berth_priority[j].id]){
+                        boat_num_in_berth[berth_priority[j].id]++;
+                        printf("ship %d %d\n", i, berth_priority[j].id);
+                        f1 << "ship " << i << " " << berth_priority[j].id << endl;
+                        break;
+                    }
                 }
             }
         }
@@ -599,35 +607,40 @@ int main()
         {   
             // 在泊位
             if(boat[i].status == 1 && boat[i].pos != -1) {
-                berth[boat[i].pos].is_occupied = true;
                 int target_berth = boat[i].pos;
-                // 泊位没有货物，等待
-                if(berth[target_berth].items.size() == 0){
+                // 泊位可以给那么多
+                int upload_num = min(berth[target_berth].loading_speed, (int)berth[target_berth].items.size());
+                // 船上还能装多少
+                upload_num = min(upload_num, boat_capacity - boat[i].num);
+                boat[i].num += upload_num;
+                for(int j = 0; j < upload_num; j ++){
+                    berth[target_berth].total_value -= berth[target_berth].items.front();
+                    berth[target_berth].items.pop_front();
+                }                    
+                // 货满了出发
+                if(boat[i].num == boat_capacity) {
+                    printf("go %d\n", i);
+                    boat_num_in_berth[target_berth]--;
                     break;
                 }
-                // 有货物，装载
-                else{
-                    // 泊位可以给那么多
-                    int upload_num = min(berth[target_berth].loading_speed, (int)berth[target_berth].items.size());
-                    // 船上还能装多少
-                    upload_num = min(upload_num, boat_capacity - boat[i].num);
-                    boat[i].num += upload_num;
-                    for(int j = 0; j < upload_num; j ++){
-                        berth[target_berth].total_value -= berth[target_berth].items.front();
-                        berth[target_berth].items.pop_front();
-                    }                    
-                    // 货满了出发
-                    if(boat[i].num == boat_capacity) {
-                        berth[boat[i].pos].is_occupied = false;
+                // 没货了，船未满3/4，去别的泊位
+                if(berth[target_berth].items.size() == 0) {
+                    if(boat[i].num < boat_capacity*3/4) {
+                        for(int j = 0; j < berth_num; j++){
+                            if(berth[berth_priority[j].id].items.size()/boat_capacity >= boat_num_in_berth[berth_priority[j].id]){
+                                printf("ship %d %d\n", i, berth_priority[j].id);
+                                f1 << "ship " << i << " " << berth_priority[j].id << endl;
+                                boat_num_in_berth[berth_priority[j].id]++;
+                                break;
+                            }
+                        }
+                    }
+                    else{
                         printf("go %d\n", i);
+                        boat_num_in_berth[target_berth]--;
                         break;
                     }
-                    // 没货了，直接出发
-                    if(berth[target_berth].items.size() == 0) {
-                        berth[boat[i].pos].is_occupied = false;
-                        printf("go %d\n", i);
-                        break;
-                    }
+                    break;
                 }
             }
         }
