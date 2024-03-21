@@ -1,7 +1,7 @@
 #include <bits/stdc++.h>
 #include<fstream>
 using namespace std;
-fstream f1;
+// fstream f1;
 
 const int n = 200;
 const int robot_num = 10;
@@ -25,6 +25,8 @@ int berth_center[10][2];
 char ch[N][N];
 // 物品位置
 int gds[N][N];
+// 物品出现帧数
+int gds_frame[N][N];
 // 机器人搬运物品总价值
 int all_value;
 
@@ -113,7 +115,6 @@ struct Boat
     }
 }boat[boat_num + 10];
 
-
 deque<Item> items_exist;
 
 void Init()
@@ -157,6 +158,7 @@ int Input()
         int x, y, val;
         scanf("%d%d%d", &x, &y, &val);
         gds[x+1][y+1] = val;
+        gds_frame[x+1][y+1] = id;
         Item item = Item(x+1, y+1, val, id);
         items_exist.push_back(item);
     }
@@ -241,6 +243,8 @@ vector<vector<pair<int, int>>> BFSItem(pair<int, int> start, int bot_id) {
         pair<int, int> pos = q.front().first;
         vector<pair<int, int>> path = q.front().second;
         int length = path.size()-1;
+        // 长度超过一定程度不再搜索
+        if(length >= 1000) continue;
         q.pop();
         // 如果当前位置有物品，记录路径
         if (gds[pos.first][pos.second] != 0) {
@@ -281,7 +285,7 @@ pair<int, vector<pair<int, int>>> BFSBerth(pair<int, int> start, int bot_id) {
         // 如果到达泊位，记录路径
         // 泊位的大小为4*4，左上角为berth[i].x 和berth[i].y
         for(int i = 0; i < berth_num; i++){
-            if(pos.first >= berth[i].x && pos.first < berth[i].x + 4 && pos.second >= berth[i].y && pos.second < berth[i].y + 4){
+            if(ch[pos.first][pos.second]=='B'){
                 return {i, path};
             }
         }
@@ -306,8 +310,9 @@ vector<pair<int, int>> ChoosePath(vector<vector<pair<int, int>>>& paths) {
     vector<pair<int, int>> best_path;
     int best_value = 0;
     for (const auto& path : paths) {
+        // if(1000- id + gds_frame[path.back().first][path.back().second] < path.size()) continue;
         float value = 0;
-        value = static_cast<double>(gds[path.back().first][path.back().second]) / (path.size()-1);
+        value = static_cast<double>(gds[path.back().first][path.back().second]) / path.size();
         if (value > best_value) {
             best_value = value;
             best_path = path;
@@ -335,12 +340,12 @@ int GetDirection(pair<int, int> a, pair<int, int> b) {
 
 int main()
 {   
-    f1.open("data.txt",ios::out);
+    // f1.open("data.txt",ios::out);
     Init();
     for(int zhen = 1; zhen <= 15000; zhen ++)
     {
         int id = Input();
-        f1 << "id: " << id << endl;
+        // f1 << "id: " << id << endl;
         // 机器人部分
         // 首先要判断服务器是否正确移动，如果没有正确移动，回到寻路状态
         // 然后判断机器人是否处于正常状态，如果处于恢复状态去状态6
@@ -359,6 +364,10 @@ int main()
                     bot.zt--;
                     continue;
                 }
+                // 每10帧重新计算一个机器人的新路径
+                // if(i == zhen % 10 && zhen > 10 && bot.zt == 1) {
+                //     bot.zt = 0;
+                // }
                 // 正常移动
                 robot[i].current_index++;
             }
@@ -368,14 +377,14 @@ int main()
             Robot& bot = robot[bot_num];
             // 机器人包括6个状态
             // 0:寻找去货物的最短路 1:运输途中 2: 到达货物点 3: 寻找到泊位的最短路 4：去往泊位 5: 到达泊位 6：恢复状态
-            f1 << "bot_num: " << bot_num << " status: " << bot.zt << endl;
+            // f1 << "bot_num: " << bot_num << " status: " << bot.zt << endl;
             switch (bot.zt)
             {
             // 状态0：寻路物品
             case 0:{
                 find_item:
                 bot.clearPath();
-                if(bot.bfs_fail_time > 10) {
+                if(bot.bfs_fail_time > 20) {
                     break;
                 }
                 vector<vector<pair<int, int>>> paths = BFSItem({bot.x, bot.y}, bot_num);
@@ -393,11 +402,6 @@ int main()
             }
             // 状态2：去物品点途中
             case 1:{
-                // 每10帧重新计算一次，附近有没有更好的物品。
-                // if((bot.current_index+1) % 10 == 0) {
-                //     bot.zt = 0;
-                //     goto find_item;
-                // }
 
                 // 物品被抢走
                 if(gds[bot.mbx][bot.mby] == 0) {
@@ -481,7 +485,6 @@ int main()
                     berth[bot.target_berth].items.push_back(bot.value);
                     berth[bot.target_berth].total_value += bot.value;
                     all_value += bot.value;
-                    f1 << "all_value: " << all_value << endl;
                     goto find_item;
                 }
                 else{
@@ -550,7 +553,7 @@ int main()
                 int target_berth = boat[i].pos;
 
                 // 要结束了提前返回
-                if(berth[target_berth].transport_time == 14990-id){
+                if(berth[target_berth].transport_time > 14990-id){
                     printf("go %d\n", i);
                     break;
                 }
@@ -571,7 +574,7 @@ int main()
                 }
                 // 没货了，船未满一半，且时间充裕，去别的泊位
                 if(berth[target_berth].items.size() == 0) {
-                    if(boat[i].num < boat_capacity*1/2 && berth[target_berth].transport_time < 14490 - id) {
+                    if(boat[i].num < boat_capacity*3/4 && berth[target_berth].transport_time < 14490 - id) {
                         for(int j = 0; j < berth_num; j++){
                             if(berth[berth_priority[j].id].items.size()/boat_capacity >= boat_num_in_berth[berth_priority[j].id]){
                                 printf("ship %d %d\n", i, berth_priority[j].id);
@@ -592,6 +595,6 @@ int main()
         puts("OK");
         fflush(stdout);
     }
-    f1.close();
+    // f1.close();
     return 0;
 }
