@@ -11,8 +11,8 @@ const int N = 210;
 const int dxs[] = {0, 0, -1, 1};
 const int dys[] = {1, -1, 0, 0};
 // 物品平衡二叉树排序的权重
-const float quanzhong_distance = 20;
-const float quanzhong_value = 0.1;
+const float quanzhong_distance = 1;
+const float quanzhong_value = 0.6;
 // 泊位效率，金钱，和时间的权重
 const float quanzhong_efficiency = 10;
 const float quanzhong_money = 1;
@@ -222,14 +222,6 @@ bool Collision(int x1, int y1, int x2, int y2, int step, int bot_id){
                 }
                 // 上下对撞
                 if(y1 == predict_y1 && y2 == predict_y2 && x2 == predict_x1 && x1 == predict_x2){
-                    return false;
-                }
-            }
-            // 最后一步，机器人到达之后，最后一帧当成障碍在原地不动
-            if(robot[i].current_index+step+1 == robot[i].path.size()){
-                predict_x2 = robot[i].path.back().first;
-                predict_y2 = robot[i].path.back().second;
-                if(x2 == predict_x2 && y2 == predict_y2){
                     return false;
                 }
             }
@@ -467,10 +459,18 @@ int main()
                 //     bot.zt = 0;
                 //     goto find_item;
                 // }
+
+                // 物品被抢走
+                if(gds[bot.mbx][bot.mby] == 0) {
+                    bot.zt = 0;
+                    goto find_item;
+                }
+
                 // 系统确认到达目的地
                 if(bot.x == bot.mbx && bot.y == bot.mby){
                     bot.zt = 2;
                 }
+
                 // 还在路上
                 else{
                     // 物品消失
@@ -498,12 +498,13 @@ int main()
                 else{
                     if(gds[bot.mbx][bot.mby] != 0) {
                         printf("get %d\n", bot_num);
+                        break;
                     }
                     // 物品消失，重新寻路
                     else{
                         bot.zt = 0;
+                        goto find_item;
                     }
-                    break;
                 }
             }
             // 状态3：寻找泊位
@@ -644,7 +645,7 @@ int main()
                     boat_num_in_berth[target_berth]--;
                     break;
                 }
-                // 没货了，船未满3/4，去别的泊位且时间充裕
+                // 没货了，船未满3/4，且时间充裕，去别的泊位
                 if(berth[target_berth].items.size() == 0) {
                     if(boat[i].num < boat_capacity*3/4 && berth[target_berth].transport_time < 14490 - id) {
                         for(int j = 0; j < berth_num; j++){
