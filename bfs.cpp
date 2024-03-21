@@ -10,25 +10,19 @@ const int boat_num = 5;
 const int N = 210;
 const int dxs[] = {0, 0, -1, 1};
 const int dys[] = {1, -1, 0, 0};
-// 物品平衡二叉树排序的权重
-const float quanzhong_distance = 10;
-const float quanzhong_value = 0.6;
 // 泊位效率，金钱，和时间的权重
 const float quanzhong_efficiency = 10;
 const float quanzhong_money = 1;
 const float quanzhong_time = 1;
 // 金钱，船只容量，当前帧数
 int money, boat_capacity, id;
-// 泊位中心点
-int berth_center[10][2];
 // 地图
 char ch[N][N];
 // 物品位置
 int gds[N][N];
 // 物品出现帧数
 int gds_frame[N][N];
-// 机器人搬运物品总价值
-int all_value;
+
 
 struct Item
 {
@@ -135,11 +129,6 @@ void Init()
     scanf("%d", &boat_capacity);
     char okk[100];
     scanf("%s", okk);
-    // 泊位中心
-    for(int i =0; i < berth_num; i++){
-        berth_center[i][0] = berth[i].x + 2;
-        berth_center[i][1] = berth[i].y + 2;
-    }
     printf("OK\n");
     fflush(stdout);
 }
@@ -244,7 +233,7 @@ vector<vector<pair<int, int>>> BFSItem(pair<int, int> start, int bot_id) {
         vector<pair<int, int>> path = q.front().second;
         int length = path.size()-1;
         // 长度超过一定程度不再搜索
-        if(length >= 1000) continue;
+        if(length >= 500) continue;
         q.pop();
         // 如果当前位置有物品，记录路径
         if (gds[pos.first][pos.second] != 0) {
@@ -285,7 +274,7 @@ pair<int, vector<pair<int, int>>> BFSBerth(pair<int, int> start, int bot_id) {
         // 如果到达泊位，记录路径
         // 泊位的大小为4*4，左上角为berth[i].x 和berth[i].y
         for(int i = 0; i < berth_num; i++){
-            if(ch[pos.first][pos.second]=='B'){
+            if(pos.first >= berth[i].x && pos.first < berth[i].x + 4 && pos.second >= berth[i].y && pos.second < berth[i].y + 4){
                 return {i, path};
             }
         }
@@ -310,7 +299,7 @@ vector<pair<int, int>> ChoosePath(vector<vector<pair<int, int>>>& paths) {
     vector<pair<int, int>> best_path;
     int best_value = 0;
     for (const auto& path : paths) {
-        // if(1000- id + gds_frame[path.back().first][path.back().second] < path.size()) continue;
+        if(1000- id + gds_frame[path.back().first][path.back().second] < path.size()) continue;
         float value = 0;
         value = static_cast<double>(gds[path.back().first][path.back().second]) / path.size();
         if (value > best_value) {
@@ -364,10 +353,10 @@ int main()
                     bot.zt--;
                     continue;
                 }
-                // 每10帧重新计算一个机器人的新路径
-                // if(i == zhen % 10 && zhen > 10 && bot.zt == 1) {
-                //     bot.zt = 0;
-                // }
+                // 每20帧重新计算一个机器人的新路径
+                if(i == zhen % 20 && zhen > 20 && bot.zt == 1) {
+                    bot.zt = 0;
+                }
                 // 正常移动
                 robot[i].current_index++;
             }
@@ -484,7 +473,6 @@ int main()
                     bot.zt = 0;
                     berth[bot.target_berth].items.push_back(bot.value);
                     berth[bot.target_berth].total_value += bot.value;
-                    all_value += bot.value;
                     goto find_item;
                 }
                 else{
