@@ -625,7 +625,7 @@ int main()
                 int target_berth = boat[i].pos;
 
                 // 要结束了提前返回
-                if(berth[target_berth].transport_time == 15000-id-1){
+                if(berth[target_berth].transport_time == 14990-id){
                     printf("go %d\n", i);
                     break;
                 }
@@ -644,9 +644,9 @@ int main()
                     boat_num_in_berth[target_berth]--;
                     break;
                 }
-                // 没货了，船未满3/4，去别的泊位
+                // 没货了，船未满3/4，去别的泊位且时间充裕
                 if(berth[target_berth].items.size() == 0) {
-                    if(boat[i].num < boat_capacity*3/4) {
+                    if(boat[i].num < boat_capacity*3/4 && berth[target_berth].transport_time < 14490 - id) {
                         for(int j = 0; j < berth_num; j++){
                             if(berth[berth_priority[j].id].items.size()/boat_capacity >= boat_num_in_berth[berth_priority[j].id]){
                                 printf("ship %d %d\n", i, berth_priority[j].id);
