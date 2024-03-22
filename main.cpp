@@ -390,7 +390,7 @@ int main()
             }
         }
         // 之后，所有处于寻路状态的机器人位置都正确，位于current_index上
-        int bfs_time = 0;
+        // int bfs_time = 0;
         for(int bot_num = 0; bot_num < robot_num; bot_num++){
             Robot& bot = robot[bot_num];
             // 机器人包括6个状态
@@ -404,10 +404,10 @@ int main()
                 if(bot.bfs_fail_time >=50) {
                     break;
                 }
-                if(bfs_time>=1) break; 
+                // if(bfs_time>=1) break; 
                 vector<vector<pair<int, int>>> paths = BFSItem({bot.x, bot.y}, bot_num);
                 vector<pair<int, int>> path = ChoosePath(paths);
-                bfs_time++;
+                // bfs_time++;
                 if(path.empty()) {
                     bot.bfs_fail_time++;
                     break;
