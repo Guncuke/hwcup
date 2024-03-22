@@ -12,19 +12,14 @@ const int dys[] = {1, -1, 0, 0};
 const float quanzhong_efficiency = 10;
 const float quanzhong_money = 20;
 const float quanzhong_time = 1;
-// 金钱，船只容量，当前帧数
 int money, boat_capacity, id;
-// 地图
 char ch[N][N];
-// 物品位置
+// 物品位置与出现帧
 int gds[N][N];
-// 物品出现帧数
 int gds_frame[N][N];
-
 
 struct Item
 {
-    // 物品位置，价值和剩余帧数
     int x, y, val, appear_frame;
     Item(){}
     Item(int x, int y, int val, int appear_frame) {
@@ -45,14 +40,11 @@ struct Robot
     int status;
     int mbx, mby;
     int zt;
-    // 机器人目标泊位
+    // 机器人目标泊位，身上的货物价值，路径，当前路径的下标
     int target_berth;
-    // 机器人身上物品的价值
     int value;
-    // 当前机器人的路径和当前位置
     vector<pair<int, int>> path;
     int current_index=-1;
-    // 机器人寻路失败次数
     int bfs_fail_time;
     Robot() {}
     Robot(int startX, int startY) {
@@ -68,18 +60,12 @@ struct Robot
 struct Berth
 {   
     int id;
-    // 泊位左上角位置，泊位大小4*4
     int x;
     int y;
-    // 泊位到虚拟点需要的时间
     int transport_time;
-    // 泊位装载速度
     int loading_speed;
-    // 泊位上的物品价值链表
     deque<int> items;
-    // 总价值
     int total_value;
-    // 最小剩余价值
     int min_value;
     Berth(){}
     Berth(int x, int y, int transport_time, int loading_speed) {
@@ -92,10 +78,7 @@ struct Berth
 
 struct Boat
 {   
-    // num: 当前装载量
-    // status: 0: 运输中 1: 装货或运输完成 2:泊位外等待
-    // pos: 目标泊位
-    int num=0, pos, status;
+    int num, pos, status;
     Boat(){}
     Boat(int num, int pos, int status) {
         this -> num = num;
@@ -128,17 +111,13 @@ void Init()
     fflush(stdout);
 }
 
-
 int Input()
 {
-    // 当前帧和金钱
     scanf("%d%d", &id, &money);
     int num;
-    // 读入新增物品信息
     scanf("%d", &num);
     for(int i = 1; i <= num; i ++)
     {
-        // 新增物品的位置和价值
         int x, y, val;
         scanf("%d%d%d", &x, &y, &val);
         gds[x+1][y+1] = val;
@@ -150,27 +129,20 @@ int Input()
         gds[items_exist.front().x][items_exist.front().y] = 0;
         items_exist.pop_front();
     }
-
-    // 读入机器人信息
     for(int i = 0; i < robot_num; i ++)
     {
         int sts;
-        // 是否携带货物，坐标，状态
         scanf("%d%d%d%d", &robot[i].goods, &robot[i].x, &robot[i].y, &robot[i].status);
         robot[i].x ++;
         robot[i].y ++;
     }
-
-    // 读入船只信息
     for(int i = 0; i < boat_num; i ++)
         scanf("%d%d\n", &boat[i].status, &boat[i].pos);
     char okk[100];
     scanf("%s", okk);
     return id;
 }
-
 // 冲突解决方案
-// 拓展节点对应步与已有路径不冲突
 bool Collision(int x1, int y1, int x2, int y2, int step, int bot_id){
     // 其他机器人在第g步的预测值
     int predict_x1, predict_y1, predict_x2, predict_y2;
@@ -182,15 +154,12 @@ bool Collision(int x1, int y1, int x2, int y2, int step, int bot_id){
                 predict_y1 = robot[i].path[robot[i].current_index+step].second;
                 predict_x2 = robot[i].path[robot[i].current_index+step+1].first;
                 predict_y2 = robot[i].path[robot[i].current_index+step+1].second;
-                // 直接撞上
                 if(x2 == predict_x2 && y2 == predict_y2){
                     return false;
                 }
-                // 左右对撞
                 if(x1 == predict_x1 && x2 == predict_x2 && y2 == predict_y1 && y1 == predict_y2){
                     return false;
                 }
-                // 上下对撞
                 if(y1 == predict_y1 && y2 == predict_y2 && x2 == predict_x1 && x1 == predict_x2){
                     return false;
                 }
@@ -215,30 +184,24 @@ bool Collision(int x1, int y1, int x2, int y2, int step, int bot_id){
 vector<vector<pair<int, int>>> BFSItem(pair<int, int> start, int bot_id) {
     int N = 201;
     vector<vector<bool>> visited(N, vector<bool>(N, false));
-    // 存储坐标和路径
     queue<pair<pair<int, int>, vector<pair<int, int>>>> q; 
-    // 存储每个目标点的路径
     vector<vector<pair<int, int>>> paths; 
 
-    q.push({start, {start}}); // 起始坐标和路径
+    q.push({start, {start}});
     visited[start.first][start.second] = true;
 
     while (!q.empty()) {
         pair<int, int> pos = q.front().first;
         vector<pair<int, int>> path = q.front().second;
         int length = path.size()-1;
-        // 长度超过一定程度不再搜索
-        if(length >= 500) continue;
+        if(length >= 600) continue;
         q.pop();
-        // 如果当前位置有物品，记录路径
         if (gds[pos.first][pos.second] != 0) {
             paths.push_back(path);
         }
-        // 遍历当前位置的四个方向
         for (int i = 0; i < 4; i++) {
             int new_x = pos.first + dxs[i];
             int new_y = pos.second + dys[i];
-            // 检查新坐标是否在矩阵范围内且是空地且未访问过
             if (new_x >= 1 && new_x < N && new_y >= 1 && new_y < N && !visited[new_x][new_y] && ch[new_x][new_y] != '*' && ch[new_x][new_y] != '#' && Collision(pos.first, pos.second, new_x, new_y, length, bot_id)) {
                 vector<pair<int, int>> new_path = path;
                 new_path.push_back({new_x, new_y});
@@ -249,16 +212,13 @@ vector<vector<pair<int, int>>> BFSItem(pair<int, int> start, int bot_id) {
     }
     return paths;
 }
-
-
 // BFS寻泊
 pair<int, vector<pair<int, int>>> BFSBerth(pair<int, int> start, int bot_id) {
     int N = 201;
     vector<vector<bool>> visited(N, vector<bool>(N, false));
-    // 存储坐标和路径
     queue<pair<pair<int, int>, vector<pair<int, int>>>> q; 
 
-    q.push({start, {start}}); // 起始坐标和路径
+    q.push({start, {start}});
     visited[start.first][start.second] = true;
 
     while (!q.empty()) {
@@ -266,18 +226,14 @@ pair<int, vector<pair<int, int>>> BFSBerth(pair<int, int> start, int bot_id) {
         vector<pair<int, int>> path = q.front().second;
         int length = path.size()-1;
         q.pop();
-        // 如果到达泊位，记录路径
-        // 泊位的大小为4*4，左上角为berth[i].x 和berth[i].y
         for(int i = 0; i < berth_num; i++){
             if(pos.first >= berth[i].x && pos.first < berth[i].x + 4 && pos.second >= berth[i].y && pos.second < berth[i].y + 4){
                 return {i, path};
             }
         }
-        // 遍历当前位置的四个方向
         for (int i = 0; i < 4; i++) {
             int new_x = pos.first + dxs[i];
             int new_y = pos.second + dys[i];
-            // 检查新坐标是否在矩阵范围内且是空地且未访问过
             if (new_x >= 1 && new_x < N && new_y >= 1 && new_y < N && !visited[new_x][new_y] && ch[new_x][new_y] != '*' && ch[new_x][new_y] != '#' && Collision(pos.first, pos.second, new_x, new_y, length, bot_id)) {
                 vector<pair<int, int>> new_path = path;
                 new_path.push_back({new_x, new_y});
@@ -288,7 +244,6 @@ pair<int, vector<pair<int, int>>> BFSBerth(pair<int, int> start, int bot_id) {
     }
     return {-1, {}};
 }
-
 // 根据每paths里每一条路径的长度和目标物品的价值，用价值/距离来取最大的一条路径
 vector<pair<int, int>> ChoosePath(vector<vector<pair<int, int>>>& paths) {
     vector<pair<int, int>> best_path;
@@ -321,9 +276,7 @@ int GetDirection(pair<int, int> a, pair<int, int> b) {
         }
     }
 }
-
 // 获得当前每个泊位的最小价值
-// 即每个泊位扣去被目前的船装完剩下的价值
 void GetMinValue(){
     int berth_residue_item[10] = {0};
     for(int i = 0; i < boat_num; i++){
@@ -342,7 +295,6 @@ void GetMinValue(){
         }
     }
 }
-
 // 泊位选择
 int ChooseBerth(){
     // 根据泊位剩余价值/效率/时间 选择最大的一个
@@ -364,12 +316,9 @@ int main()
     {
         int id = Input();
         // 机器人部分
-        // 首先要判断服务器是否正确移动，如果没有正确移动，回到寻路状态
-        // 然后判断机器人是否处于正常状态，如果处于恢复状态去状态6
         for(int i = 0; i < robot_num; i ++)
         {
             Robot& bot = robot[i];
-            // 如果是恢复状态，进入状态6
             if(bot.status==0){
                 bot.zt=6;
                 bot.clearPath();
@@ -381,19 +330,17 @@ int main()
                     bot.zt--;
                     continue;
                 }
-                // 每10帧重新计算一个机器人的新路径
-                if(i == (zhen-1) % 10 && zhen > 10 && bot.zt == 1) {
+                // 每20帧重新计算一个机器人的新路径
+                if(i == (zhen-1) % 20 && zhen > 20 && bot.zt == 1) {
                     bot.zt = 0;
                 }
-                // 正常移动
                 robot[i].current_index++;
             }
         }
         // 之后，所有处于寻路状态的机器人位置都正确，位于current_index上
-        // int bfs_time = 0;
+        int bfs_time = 0;
         for(int bot_num = 0; bot_num < robot_num; bot_num++){
             Robot& bot = robot[bot_num];
-            // 机器人包括6个状态
             // 0:寻找去货物的最短路 1:运输途中 2: 到达货物点 3: 寻找到泊位的最短路 4：去往泊位 5: 到达泊位 6：恢复状态
             switch (bot.zt)
             {
@@ -404,10 +351,10 @@ int main()
                 if(bot.bfs_fail_time >=50) {
                     break;
                 }
-                // if(bfs_time>=1) break; 
+                if(bfs_time>=1) break; 
                 vector<vector<pair<int, int>>> paths = BFSItem({bot.x, bot.y}, bot_num);
                 vector<pair<int, int>> path = ChoosePath(paths);
-                // bfs_time++;
+                bfs_time++;
                 if(path.empty()) {
                     bot.bfs_fail_time++;
                     break;
@@ -419,15 +366,13 @@ int main()
                 bot.mby = path.back().second;
                 // 正常找到路径，此帧可以继续走一步，不break
             }
-            // 状态2：去物品点途中
+            // 状态1：去物品点途中
             case 1:{
-
                 // 物品被抢走
                 if(gds[bot.mbx][bot.mby] == 0) {
                     bot.zt = 0;
                     goto find_item;
                 }
-
                 // 系统确认到达目的地
                 if(bot.x == bot.mbx && bot.y == bot.mby){
                     bot.zt = 2;
@@ -530,7 +475,6 @@ int main()
             }
 
         }
-
         // 船只部分
         // 首先获得每个泊位当前的最小价值，存在berth[i].min_value中
         GetMinValue();
@@ -561,7 +505,6 @@ int main()
                 printf("ship %d %d\n", i, target_berth);
             }
         }
-
         // 在泊位
         for(int i = 0; i < boat_num; i ++)
         {   
@@ -582,13 +525,11 @@ int main()
                     berth[target_berth].total_value -= berth[target_berth].items.front();
                     berth[target_berth].items.pop_front();
                 }
-
                 // 货满了出发
                 if(boat[i].num == boat_capacity) {
                     printf("go %d\n", i);
                     break;
                 }
-
                 // 没货了，船未满一半，且时间充裕，去别的泊位
                 if(berth[target_berth].items.size() == 0) {
                     if(boat[i].num < boat_capacity*1/2 && berth[target_berth].transport_time < 14490 - id) {
